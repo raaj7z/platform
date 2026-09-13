@@ -1,129 +1,629 @@
 from __future__ import annotations
-import asyncio, json, threading
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query
-from fastapi.responses import HTMLResponse, Response
+
+import asyncio
+import json
+import threading
+from pathlib import Path
+
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from fastapi.responses import (
+    HTMLResponse,
+    Response,
+)
 from pydantic import BaseModel, Field
-from database import DB
-from crawler_runner import run as run_crawler
-from engine_runner import run_osint
-from reports import network, actor, csv_bytes, html_report
-from analysis import stylometry, behavior, compare
-from tracking import Scheduler
 
-db=DB()
-from config import SCHEMA_PATH
-if __import__("pathlib").Path(SCHEMA_PATH).exists(): db.migrate(SCHEMA_PATH)
+from .analysis import (
+    behavior,
+    compare,
+    stylometry,
+)
+from .config import (
+    DB_PATH,
+    SCHEMA_PATH,
+)
+from .crawler_runner import (
+    run as run_crawler,
+)
+from .database import DB
+from .engine_runner import (
+    run_osint,
+)
+from .reports import (
+    actor,
+    csv_bytes,
+    html_report,
+    network,
+)
+from .tracking import Scheduler
 
-app=FastAPI(title="SIH26151 Threat Intelligence Platform",version="1.0.0")
+
+# ============================================================
+# DATABASE
+# ============================================================
+
+db = DB(DB_PATH)
+
+if Path(SCHEMA_PATH).exists():
+    db.migrate(SCHEMA_PATH)
+else:
+    raise RuntimeError(
+        f"Shared schema not found: {SCHEMA_PATH}"
+    )
+
+
+# ============================================================
+# APPLICATION
+# ============================================================
+
+app = FastAPI(
+    title="SIH26151 Threat Intelligence Platform",
+    version="1.0.0",
+)
+
+
+# ============================================================
+# REQUEST MODELS
+# ============================================================
 
 class Crawl(BaseModel):
-    urls:list[str]=Field(min_length=1); target:str|None=None; workers:int=Field(3,ge=1,le=10)
-class Investigate(BaseModel):
-    target:str; target_type:str="other"; notes:str|None=None
-class Watch(BaseModel):
-    actor_id:str; interval_minutes:int=Field(60,ge=5)
-class Persona(BaseModel):
-    posts:list[dict]
-class ComparePersona(BaseModel):
-    persona_a:dict; persona_b:dict
+    urls: list[str] = Field(
+        min_length=1
+    )
 
-@app.get("/",response_class=HTMLResponse)
+    target: str | None = None
+
+    workers: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+    )
+
+
+class Investigate(BaseModel):
+    target: str
+    target_type: str = "other"
+    notes: str | None = None
+
+
+class Watch(BaseModel):
+    actor_id: str
+
+    interval_minutes: int = Field(
+        default=60,
+        ge=5,
+    )
+
+
+class Persona(BaseModel):
+    posts: list[dict]
+
+
+class ComparePersona(BaseModel):
+    persona_a: dict
+    persona_b: dict
+
+
+# ============================================================
+# HOME
+# ============================================================
+
+@app.get(
+    "/",
+    response_class=HTMLResponse,
+)
 def home():
-    return __import__("pathlib").Path(__file__).resolve().parent.parent.joinpath("web/index.html").read_text()
+    html_path = (
+        Path(__file__)
+        .resolve()
+        .parent
+        .parent
+        / "web"
+        / "index.html"
+    )
+
+    if not html_path.exists():
+        raise HTTPException(
+            500,
+            "web/index.html not found",
+        )
+
+    return html_path.read_text(
+        encoding="utf-8"
+    )
+
+
+# ============================================================
+# HEALTH
+# ============================================================
+
+@app.get("/api/health")
+def health():
+    return {
+        "status": "ok",
+        "database": DB_PATH,
+        "schema": SCHEMA_PATH,
+    }
+
+
+# ============================================================
+# CRAWLER
+# ============================================================
 
 @app.post("/api/crawl")
-def crawl(r:Crawl):
-    iid,actor_id=db.create_investigation(r.target or r.urls[0],"username" if r.target else "url","crawler")
-    jid=db.create_job("crawl",iid,r.model_dump())
-    threading.Thread(target=run_crawler,args=(db,jid,r.urls,r.target,r.workers),daemon=True).start()
-    return {"job_id":jid,"investigation_id":iid,"actor_id":actor_id}
+def crawl(request: Crawl):
+    investigation_id, actor_id = (
+        db.create_investigation(
+            request.target
+            or request.urls[0],
+            "username"
+            if request.target
+            else "url",
+            "crawler",
+        )
+    )
+
+    job_id = db.create_job(
+        "crawl",
+        investigation_id,
+        request.model_dump(),
+    )
+
+    thread = threading.Thread(
+        target=run_crawler,
+        kwargs={
+            "db": db,
+            "job_id": job_id,
+            "investigation_id": investigation_id,
+            "actor_id": actor_id,
+            "urls": request.urls,
+            "target": request.target,
+            "workers": request.workers,
+        },
+        daemon=True,
+    )
+
+    thread.start()
+
+    return {
+        "job_id": job_id,
+        "investigation_id": investigation_id,
+        "actor_id": actor_id,
+    }
+
+
+# ============================================================
+# OSINT
+# ============================================================
 
 @app.post("/api/investigate")
-def investigate(r:Investigate):
-    iid,actor_id=db.create_investigation(r.target,r.target_type,"manual",r.notes)
-    jid=db.create_job("osint",iid,r.model_dump())
-    threading.Thread(target=run_osint,args=(db,jid,iid,r.target,r.target_type),daemon=True).start()
-    return {"job_id":jid,"investigation_id":iid,"actor_id":actor_id}
+def investigate(
+    request: Investigate,
+):
+    investigation_id, actor_id = (
+        db.create_investigation(
+            request.target,
+            request.target_type,
+            "manual",
+            request.notes,
+        )
+    )
 
-@app.get("/api/jobs/{jid}")
-def job(jid):
-    x=db.job(jid)
-    if not x:raise HTTPException(404,"job not found")
-    return {"job":x,"events":db.events(jid)}
+    job_id = db.create_job(
+        "osint",
+        investigation_id,
+        request.model_dump(),
+    )
 
-@app.websocket("/ws/jobs/{jid}")
-async def ws(ws:WebSocket,jid:str):
-    await ws.accept(); sent=set()
+    thread = threading.Thread(
+        target=run_osint,
+        kwargs={
+            "db": db,
+            "job_id": job_id,
+            "iid": investigation_id,
+            "actor_id": actor_id,
+            "target": request.target,
+            "target_type": request.target_type,
+        },
+        daemon=True,
+    )
+
+    thread.start()
+
+    return {
+        "job_id": job_id,
+        "investigation_id": investigation_id,
+        "actor_id": actor_id,
+    }
+
+
+# ============================================================
+# JOB
+# ============================================================
+
+@app.get("/api/jobs/{job_id}")
+def get_job(job_id: str):
+    job = db.job(job_id)
+
+    if not job:
+        raise HTTPException(
+            404,
+            "job not found",
+        )
+
+    return {
+        "job": job,
+        "events": db.events(job_id),
+    }
+
+
+# ============================================================
+# WEBSOCKET
+# ============================================================
+
+@app.websocket(
+    "/ws/jobs/{job_id}"
+)
+async def websocket_job(
+    websocket: WebSocket,
+    job_id: str,
+):
+    await websocket.accept()
+
+    sent = set()
+
     try:
         while True:
-            x=db.job(jid)
-            if not x:return
-            for e in db.events(jid):
-                if e["event_id"] in sent:continue
-                sent.add(e["event_id"])
-                try:e["payload"]=json.loads(e["payload"])
-                except:pass
-                await ws.send_json(e)
-            if x["status"] in ("completed","failed"):
-                await ws.send_json({"event_type":"terminal","status":x["status"]});return
-            await asyncio.sleep(.8)
-    except WebSocketDisconnect:pass
+            job = db.job(job_id)
+
+            if not job:
+                await websocket.send_json(
+                    {
+                        "event_type": "error",
+                        "message": "job not found",
+                    }
+                )
+                return
+
+            events = db.events(job_id)
+
+            for event in events:
+                event_id = event[
+                    "event_id"
+                ]
+
+                if event_id in sent:
+                    continue
+
+                sent.add(event_id)
+
+                try:
+                    event["payload"] = json.loads(
+                        event["payload"]
+                    )
+                except Exception:
+                    pass
+
+                await websocket.send_json(
+                    event
+                )
+
+            if job["status"] in (
+                "completed",
+                "failed",
+            ):
+                await websocket.send_json(
+                    {
+                        "event_type": "terminal",
+                        "status": job["status"],
+                    }
+                )
+
+                return
+
+            await asyncio.sleep(0.8)
+
+    except WebSocketDisconnect:
+        return
+
+
+# ============================================================
+# INVESTIGATIONS
+# ============================================================
 
 @app.get("/api/investigations")
-def investigations():return db.investigations()
-@app.get("/api/investigations/{iid}")
-def investigation(iid):
-    x=db.investigation(iid)
-    if not x:raise HTTPException(404,"investigation not found")
-    return x
+def investigations():
+    return db.investigations()
 
-@app.get("/api/reports/{iid}/network")
-def network_report(iid):
-    x=db.investigation(iid)
-    if not x:raise HTTPException(404,"not found")
-    return network(x)
-@app.get("/api/reports/{iid}/threat-actor")
-def actor_report(iid):
-    x=db.investigation(iid)
-    if not x:raise HTTPException(404,"not found")
-    return actor(x)
+
+@app.get(
+    "/api/investigations/{investigation_id}"
+)
+def investigation(
+    investigation_id: str,
+):
+    result = db.investigation(
+        investigation_id
+    )
+
+    if not result:
+        raise HTTPException(
+            404,
+            "investigation not found",
+        )
+
+    return result
+
+
+# ============================================================
+# REPORTS
+# ============================================================
+
+@app.get(
+    "/api/reports/{investigation_id}/network"
+)
+def network_report(
+    investigation_id: str,
+):
+    result = db.investigation(
+        investigation_id
+    )
+
+    if not result:
+        raise HTTPException(
+            404,
+            "investigation not found",
+        )
+
+    return network(result)
+
+
+@app.get(
+    "/api/reports/{investigation_id}/threat-actor"
+)
+def actor_report(
+    investigation_id: str,
+):
+    result = db.investigation(
+        investigation_id
+    )
+
+    if not result:
+        raise HTTPException(
+            404,
+            "investigation not found",
+        )
+
+    return actor(result)
+
+
+# ============================================================
+# FINDINGS
+# ============================================================
 
 @app.get("/api/findings")
-def findings(actor:str|None=None,finding_type:str|None=None,confidence:float|None=Query(None,ge=0,le=1),q:str|None=None):
-    return db.filtered_findings(actor,finding_type,confidence,q)
+def findings(
+    actor: str | None = None,
+    finding_type: str | None = None,
+    confidence: float | None = Query(
+        default=None,
+        ge=0,
+        le=1,
+    ),
+    q: str | None = None,
+):
+    return db.filtered_findings(
+        actor=actor,
+        ftype=finding_type,
+        confidence=confidence,
+        q=q,
+    )
 
-@app.get("/api/export/{iid}/json")
-def export_json(iid):
-    x=db.investigation(iid)
-    if not x:raise HTTPException(404,"not found")
-    return Response(json.dumps(x,indent=2,default=str),media_type="application/json",
-                    headers={"Content-Disposition":f'attachment; filename="{iid}.json"'})
-@app.get("/api/export/{iid}/csv")
-def export_csv(iid):
-    x=db.investigation(iid)
-    if not x:raise HTTPException(404,"not found")
-    return Response(csv_bytes(x["findings"]),media_type="text/csv",
-                    headers={"Content-Disposition":f'attachment; filename="{iid}.csv"'})
-@app.get("/api/export/{iid}/html")
-def export_html(iid):
-    x=db.investigation(iid)
-    if not x:raise HTTPException(404,"not found")
-    return Response(html_report("SIH26151 Investigation",x),media_type="text/html",
-                    headers={"Content-Disposition":f'attachment; filename="{iid}.html"'})
+
+# ============================================================
+# EXPORT
+# ============================================================
+
+@app.get(
+    "/api/export/{investigation_id}/json"
+)
+def export_json(
+    investigation_id: str,
+):
+    result = db.investigation(
+        investigation_id
+    )
+
+    if not result:
+        raise HTTPException(
+            404,
+            "investigation not found",
+        )
+
+    return Response(
+        json.dumps(
+            result,
+            indent=2,
+            default=str,
+        ),
+        media_type="application/json",
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="{investigation_id}.json"'
+        },
+    )
+
+
+@app.get(
+    "/api/export/{investigation_id}/csv"
+)
+def export_csv(
+    investigation_id: str,
+):
+    result = db.investigation(
+        investigation_id
+    )
+
+    if not result:
+        raise HTTPException(
+            404,
+            "investigation not found",
+        )
+
+    return Response(
+        csv_bytes(
+            result["findings"]
+        ),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="{investigation_id}.csv"'
+        },
+    )
+
+
+@app.get(
+    "/api/export/{investigation_id}/html"
+)
+def export_html(
+    investigation_id: str,
+):
+    result = db.investigation(
+        investigation_id
+    )
+
+    if not result:
+        raise HTTPException(
+            404,
+            "investigation not found",
+        )
+
+    return Response(
+        html_report(
+            "SIH26151 Investigation",
+            result,
+        ),
+        media_type="text/html",
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="{investigation_id}.html"'
+        },
+    )
+
+
+# ============================================================
+# WATCHLIST
+# ============================================================
 
 @app.post("/api/watchlist")
-def add_watch(r:Watch):return {"watch_id":db.watch(r.actor_id,r.interval_minutes)}
+def add_watch(request: Watch):
+    return {
+        "watch_id": db.watch(
+            request.actor_id,
+            request.interval_minutes,
+        )
+    }
+
+
 @app.get("/api/watchlist")
-def watchlist():return db.watchlist()
+def watchlist():
+    return db.watchlist()
+
+
+# ============================================================
+# ALERTS
+# ============================================================
+
 @app.get("/api/alerts")
-def alerts(unread:bool=False):return db.alerts(unread)
-@app.post("/api/alerts/{aid}/read")
-def read_alert(aid):db.mark_alert(aid);return {"ok":True}
+def alerts(
+    unread: bool = False,
+):
+    return db.alerts(unread)
+
+
+@app.post(
+    "/api/alerts/{alert_id}/read"
+)
+def read_alert(
+    alert_id: str,
+):
+    db.mark_alert(alert_id)
+
+    return {
+        "ok": True
+    }
+
+
+# ============================================================
+# PERSONA / STYLOMETRY
+# ============================================================
 
 @app.post("/api/persona/analyze")
-def persona(r:Persona):
-    return {"stylometry":stylometry(r.posts),"behavior":behavior(r.posts)}
+def persona(
+    request: Persona,
+):
+    return {
+        "stylometry": stylometry(
+            request.posts
+        ),
+        "behavior": behavior(
+            request.posts
+        ),
+    }
+
+
 @app.post("/api/persona/compare")
-def persona_compare(r:ComparePersona):
-    return {"similarity":compare(r.persona_a,r.persona_b),
-            "interpretation":"Similarity is a ranking signal, not attribution proof."}
+def persona_compare(
+    request: ComparePersona,
+):
+    return {
+        "similarity": compare(
+            request.persona_a,
+            request.persona_b,
+        ),
+        "interpretation": (
+            "Similarity is a ranking signal, "
+            "not attribution proof."
+        ),
+    }
+
+
+# ============================================================
+# STARTUP / SHUTDOWN
+# ============================================================
+
+scheduler = None
+
+
+@app.on_event("startup")
+def startup():
+    global scheduler
+
+    # Keep scheduler initialization isolated.
+    # The current tracking implementation is process-local.
+    try:
+        scheduler = Scheduler(
+            db,
+            lambda item: None,
+        )
+        scheduler.start()
+    except Exception:
+        scheduler = None
+
+
+@app.on_event("shutdown")
+def shutdown():
+    global scheduler
+
+    if scheduler is not None:
+        try:
+            scheduler.stop_event.set()
+        except Exception:
+            pass
+
+    db.close()
