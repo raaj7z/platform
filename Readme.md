@@ -1,4 +1,4 @@
-# SIH26151 Platform API — Step 1 + Step 2
+
 
 This is the first integration layer between the existing crawler and the existing `osint-engine` repository.
 
