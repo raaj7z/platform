@@ -1,1024 +1,272 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html>
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-
 <title>SIH26151 Threat Intelligence Platform</title>
 
 <style>
-:root{
-    --bg:#080b10;
-    --panel:#10151d;
-    --panel2:#171e28;
-    --panel3:#0c1118;
-    --line:#27303c;
-    --text:#edf2f7;
-    --muted:#8d99a8;
-    --accent:#62d8ff;
-    --good:#62e6a7;
-    --warn:#ffd166;
-    --bad:#ff6678;
-}
-
-*{box-sizing:border-box}
-
-body{
-    margin:0;
-    background:var(--bg);
-    color:var(--text);
-    font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-    font-size:14px;
-}
-
-button,input,select{font:inherit}
-
-button{cursor:pointer}
-
-.layout{
-    display:grid;
-    grid-template-columns:245px 1fr;
-    min-height:100vh;
-}
-
-.side{
-    border-right:1px solid var(--line);
-    background:#0b0f15;
-    padding:22px 15px;
-    position:sticky;
-    top:0;
-    height:100vh;
-}
-
-.brand{
-    font-size:19px;
-    font-weight:900;
-    letter-spacing:.4px;
-    margin-bottom:7px;
-}
-
-.brand span{color:var(--accent)}
-
-.project{
-    color:var(--muted);
-    font-size:11px;
-    margin-bottom:25px;
-}
-
-.nav button{
-    display:block;
-    width:100%;
-    text-align:left;
-    background:transparent;
-    color:var(--muted);
-    border:0;
-    padding:12px 13px;
-    border-radius:9px;
-    margin:4px 0;
-}
-
-.nav button:hover,
-.nav button.active{
-    background:var(--panel2);
-    color:var(--text);
-}
-
-.nav button.active{
-    box-shadow:inset 3px 0 0 var(--accent);
-}
-
-main{
-    width:100%;
-    max-width:1550px;
-    margin:auto;
-    padding:25px;
-}
-
-.hidden{display:none!important}
-
-.top{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:15px;
-}
-
-.eyebrow{
-    color:var(--accent);
-    font-size:11px;
-    font-weight:700;
-    letter-spacing:1.5px;
-    text-transform:uppercase;
-}
-
-.title{
-    font-size:27px;
-    font-weight:850;
-    margin:5px 0 21px;
-}
-
-.badge{
-    display:inline-block;
-    padding:5px 9px;
-    border-radius:999px;
-    background:#1a2330;
-    color:var(--muted);
-    font-size:11px;
-}
-
-.cards{
-    display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:12px;
-}
-
-.card{
-    background:var(--panel);
-    border:1px solid var(--line);
-    border-radius:13px;
-    padding:17px;
-}
-
-.metric{
-    font-size:27px;
-    font-weight:850;
-    margin-top:8px;
-}
-
-.muted{color:var(--muted)}
-
-.grid{
-    display:grid;
-    grid-template-columns:1.3fr .7fr;
-    gap:14px;
-    margin-top:14px;
-}
-
-.panel{
-    background:var(--panel);
-    border:1px solid var(--line);
-    border-radius:14px;
-    padding:17px;
-    margin-top:14px;
-}
-
-.panel h2{
-    font-size:15px;
-    margin:0 0 14px;
-}
-
-.row{
-    display:flex;
-    gap:9px;
-    flex-wrap:wrap;
-}
-
-input,select{
-    background:#090d13;
-    border:1px solid var(--line);
-    color:var(--text);
-    padding:11px 12px;
-    border-radius:9px;
-    outline:none;
-    min-width:160px;
-    flex:1;
-}
-
-input:focus,select:focus{
-    border-color:var(--accent);
-}
-
-button.primary{
-    background:var(--accent);
-    color:#061018;
-    border:0;
-    border-radius:9px;
-    padding:11px 16px;
-    font-weight:850;
-}
-
-button.primary:hover{filter:brightness(1.08)}
-
-button.secondary{
-    background:var(--panel2);
-    color:var(--text);
-    border:1px solid var(--line);
-    border-radius:9px;
-    padding:9px 13px;
-}
-
-button.secondary:hover{background:#202a37}
-
-.terminal{
-    background:#05070a;
-    border:1px solid #202833;
-    border-radius:10px;
-    padding:13px;
-    height:360px;
-    overflow:auto;
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-    font-size:12px;
-    line-height:1.7;
-}
-
-.line{
-    border-bottom:1px solid #121820;
-    padding:2px 0;
-    word-break:break-word;
-}
-
-.ok{color:var(--good)}
-.warn{color:var(--warn)}
-.bad{color:var(--bad)}
-.info{color:var(--accent)}
-
-.terminal-empty{color:#66717f}
-
-.tablewrap{
-    overflow:auto;
-    max-height:650px;
-}
-
-.table{
-    width:100%;
-    border-collapse:collapse;
-}
-
-.table th,.table td{
-    text-align:left;
-    padding:10px;
-    border-bottom:1px solid var(--line);
-    vertical-align:top;
-}
-
-.table th{
-    color:var(--muted);
-    font-size:11px;
-    text-transform:uppercase;
-    letter-spacing:.6px;
-    position:sticky;
-    top:0;
-    background:var(--panel);
-}
-
-.table td{white-space:nowrap}
-
-.value-cell{
-    max-width:360px;
-    white-space:normal!important;
-    overflow-wrap:anywhere;
-}
-
-.url-cell{
-    max-width:360px;
-    white-space:normal!important;
-    overflow-wrap:anywhere;
-}
-
-a{color:var(--accent)}
-
-.list{
-    display:grid;
-    gap:8px;
-}
-
-.item{
-    padding:11px;
-    border:1px solid var(--line);
-    border-radius:10px;
-    background:#0d1219;
-}
-
-.item:hover{background:#111923}
-
-.empty{
-    color:var(--muted);
-    padding:18px 4px;
-}
-
-.finding-count{
-    color:var(--accent);
-    font-weight:800;
-}
-
-.toolbar{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    flex-wrap:wrap;
-    margin-bottom:14px;
-}
-
-.small{font-size:12px}
-
-.detail-grid{
-    display:grid;
-    grid-template-columns:repeat(3,1fr);
-    gap:10px;
-    margin-bottom:14px;
-}
-
-.detail{
-    background:var(--panel3);
-    border:1px solid var(--line);
-    border-radius:10px;
-    padding:12px;
-}
-
-.detail-label{
-    color:var(--muted);
-    font-size:11px;
-    text-transform:uppercase;
-    margin-bottom:5px;
-}
-
-.detail-value{
-    font-weight:700;
-    overflow-wrap:anywhere;
-}
-
-.actions{
-    display:flex;
-    gap:7px;
-    flex-wrap:wrap;
-}
-
-.notice{
-    padding:11px 13px;
-    background:#101a22;
-    border:1px solid var(--line);
-    border-radius:9px;
-    color:var(--muted);
-    margin-bottom:14px;
-}
-
-.status-running{color:var(--warn)}
-.status-completed{color:var(--good)}
-.status-failed{color:var(--bad)}
-
-.confidence{font-weight:750}
-
-@media(max-width:1050px){
-    .cards{grid-template-columns:repeat(2,1fr)}
-    .grid{grid-template-columns:1fr}
-    .detail-grid{grid-template-columns:1fr}
-}
-
-@media(max-width:750px){
-    .layout{grid-template-columns:1fr}
-
-    .side{
-        position:static;
-        height:auto;
-        border-right:0;
-        border-bottom:1px solid var(--line);
-    }
-
-    .nav{
-        display:grid;
-        grid-template-columns:repeat(2,1fr);
-        gap:3px;
-    }
-
-    main{padding:15px}
-
-    .cards{grid-template-columns:1fr 1fr}
-
-    .title{font-size:22px}
-}
+body{font-family:Arial,sans-serif;margin:0;background:#111;color:#eee}
+header{background:#1b1b1b;padding:15px}
+nav{display:flex;gap:8px;flex-wrap:wrap;padding:10px;background:#222}
+button{padding:9px 13px;cursor:pointer}
+input,select,textarea{padding:9px;margin:4px;background:#222;color:#fff;border:1px solid #555}
+main{padding:20px}
+section{margin-bottom:25px}
+.card{background:#1c1c1c;padding:15px;margin:10px 0;border:1px solid #444}
+.hidden{display:none}
+pre{background:#050505;padding:15px;overflow:auto;max-height:450px}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #444;padding:8px;text-align:left}
+th{background:#222}
+.status{padding:8px;background:#333}
 </style>
 </head>
 
 <body>
 
-<div class="layout">
+<header>
+<h2>SIH26151 Threat Intelligence Platform</h2>
+<div id="health">Checking backend...</div>
+</header>
 
-<aside class="side">
-
-    <div class="brand">
-        THREAT<span>INTEL</span>
-    </div>
-
-    <div class="project">
-        SIH26151 / Investigator Console
-    </div>
-
-    <div class="nav">
-
-        <button class="active"
-                onclick="showPage('overview',this)">
-            Overview
-        </button>
-
-        <button onclick="showPage('investigate',this)">
-            New Investigation
-        </button>
-
-        <button onclick="showPage('history',this)">
-            Investigations
-        </button>
-
-        <button onclick="showPage('findings',this)">
-            Findings
-        </button>
-
-        <button onclick="showPage('alerts',this)">
-            Alerts
-        </button>
-
-        <button onclick="showPage('watch',this)">
-            Watchlist
-        </button>
-
-    </div>
-
-</aside>
+<nav>
+<button onclick="page('home')">Home</button>
+<button onclick="page('investigate')">Investigation</button>
+<button onclick="page('history')">Investigations</button>
+<button onclick="page('findings')">Findings</button>
+<button onclick="page('watch')">Watchlist</button>
+<button onclick="page('alerts')">Alerts</button>
+<button onclick="page('persona')">Persona</button>
+</nav>
 
 <main>
 
-<section id="overview">
+<section id="home">
+<h2>Dashboard</h2>
 
-    <div class="top">
+<div class="card">
+<b>Investigations:</b>
+<span id="statInvestigations">0</span>
+</div>
 
-        <div>
-            <div class="eyebrow">
-                Investigator Console
-            </div>
+<div class="card">
+<b>Findings:</b>
+<span id="statFindings">0</span>
+</div>
 
-            <div class="title">
-                Threat Actor Intelligence
-            </div>
-        </div>
+<div class="card">
+<b>Watchlist:</b>
+<span id="statWatch">0</span>
+</div>
 
-        <span class="badge">
-            LOCAL / CONTROLLED
-        </span>
+<div class="card">
+<b>Alerts:</b>
+<span id="statAlerts">0</span>
+</div>
 
-    </div>
-
-
-    <div class="cards">
-
-        <div class="card">
-            <div class="muted">Investigations</div>
-            <div class="metric" id="mInv">—</div>
-        </div>
-
-        <div class="card">
-            <div class="muted">Findings</div>
-            <div class="metric" id="mFind">—</div>
-        </div>
-
-        <div class="card">
-            <div class="muted">Tracked actors</div>
-            <div class="metric" id="mWatch">—</div>
-        </div>
-
-        <div class="card">
-            <div class="muted">Unread alerts</div>
-            <div class="metric" id="mAlert">—</div>
-        </div>
-
-    </div>
-
-
-    <div class="grid">
-
-        <div class="panel">
-
-            <h2>Latest execution</h2>
-
-            <div class="terminal"
-                 id="overviewTerminal">
-
-                <div class="terminal-empty">
-                    No active investigation.
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <div class="panel">
-
-            <h2>Recent alerts</h2>
-
-            <div class="list"
-                 id="recentAlerts">
-
-                <div class="empty">
-                    Loading...
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
+<div class="card">
+<h3>Current Job</h3>
+<div id="jobStatus">No job running</div>
+<pre id="terminal"></pre>
+</div>
 </section>
 
 
 <section id="investigate" class="hidden">
 
-    <div class="eyebrow">
-        Collection
-    </div>
+<h2>New Investigation</h2>
 
-    <div class="title">
-        New Investigation
-    </div>
+<div class="card">
+<h3>Crawler</h3>
 
-    <div class="notice">
-        Use only public or authorized sources and controlled test
-        targets. The terminal below shows the live execution state.
-    </div>
+<input id="crawlUrl"
+placeholder="URL or .onion URL">
 
+<input id="crawlTarget"
+placeholder="Optional username">
 
-    <div class="panel">
-
-        <h2>Crawler target</h2>
-
-        <div class="row">
-
-            <input
-                id="url"
-                placeholder="Authorized .onion / test URL"
-            >
-
-            <input
-                id="target"
-                placeholder="Optional handle / username"
-            >
-
-            <button
-                class="primary"
-                onclick="startCrawl()"
-            >
-                Start Crawl
-            </button>
-
-        </div>
-
-    </div>
+<button onclick="startCrawl()">Start Crawl</button>
+</div>
 
 
-    <div class="panel">
+<div class="card">
+<h3>Manual OSINT</h3>
 
-        <h2>Manual OSINT</h2>
+<input id="manualTarget"
+placeholder="Username / Email / Domain / IP / URL / PGP">
 
-        <div class="row">
+<select id="manualType">
+<option value="username">username</option>
+<option value="email">email</option>
+<option value="domain">domain</option>
+<option value="ip">ip</option>
+<option value="url">url</option>
+<option value="pgp">pgp</option>
+<option value="crypto">crypto</option>
+<option value="dns">dns</option>
+<option value="other">other</option>
+</select>
 
-            <input
-                id="manual"
-                placeholder="username, email, domain, IP, URL, PGP or wallet"
-            >
+<button onclick="startOSINT()">Run OSINT</button>
+</div>
 
-            <select id="type">
-
-                <option value="username">username</option>
-                <option value="email">email</option>
-                <option value="domain">domain</option>
-                <option value="ip">ip</option>
-                <option value="url">url</option>
-                <option value="pgp">pgp</option>
-                <option value="crypto">crypto</option>
-                <option value="dns">dns</option>
-                <option value="other">other</option>
-
-            </select>
-
-            <button
-                class="primary"
-                onclick="startManual()"
-            >
-                Run OSINT
-            </button>
-
-        </div>
-
-    </div>
-
-
-    <div class="panel">
-
-        <div class="toolbar">
-
-            <h2 style="margin:0">
-                Live Execution Terminal
-            </h2>
-
-            <span
-                class="badge"
-                id="jobStatus">
-                IDLE
-            </span>
-
-        </div>
-
-        <div
-            class="terminal"
-            id="terminal">
-
-            <div class="terminal-empty">
-                Submit a crawl or OSINT investigation to begin.
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <div
-        class="panel"
-        id="currentInvestigationPanel"
-        style="display:none"
-    >
-
-        <div class="toolbar">
-
-            <h2 style="margin:0">
-                Investigation Findings
-            </h2>
-
-            <span
-                class="finding-count"
-                id="currentFindingCount">
-                0 findings
-            </span>
-
-        </div>
-
-        <div class="tablewrap">
-
-            <table class="table">
-
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>Value</th>
-                        <th>Source</th>
-                        <th>Confidence</th>
-                        <th>Source URL</th>
-                    </tr>
-                </thead>
-
-                <tbody id="currentFindings">
-                </tbody>
-
-            </table>
-
-        </div>
-
-    </div>
+<div class="card">
+<h3>Current Investigation</h3>
+<pre id="currentInvestigation">No investigation selected</pre>
+</div>
 
 </section>
 
 
 <section id="history" class="hidden">
 
-    <div class="eyebrow">
-        Case Management
-    </div>
+<h2>Investigations</h2>
 
-    <div class="title">
-        Investigations
-    </div>
+<button onclick="loadInvestigations()">Refresh</button>
 
-    <div class="panel">
-
-        <div class="toolbar">
-
-            <span class="muted">
-                Previous investigations
-            </span>
-
-            <button
-                class="secondary"
-                onclick="loadInvestigations()">
-                Refresh
-            </button>
-
-        </div>
-
-        <div class="tablewrap">
-
-            <table class="table">
-
-                <thead>
-                    <tr>
-                        <th>Investigation</th>
-                        <th>Target</th>
-                        <th>Type</th>
-                        <th>Status</th>
-                        <th>Source</th>
-                        <th>Created</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-
-                <tbody id="hist">
-                </tbody>
-
-            </table>
-
-        </div>
-
-    </div>
-
-
-    <div
-        class="panel"
-        id="historyDetail"
-        style="display:none"
-    >
-
-        <div class="toolbar">
-
-            <h2 style="margin:0">
-                Investigation Details
-            </h2>
-
-            <button
-                class="secondary"
-                onclick="closeHistoryDetail()">
-                Close
-            </button>
-
-        </div>
-
-        <div
-            class="detail-grid"
-            id="historyMeta">
-        </div>
-
-        <div class="tablewrap">
-
-            <table class="table">
-
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>Value</th>
-                        <th>Source</th>
-                        <th>Confidence</th>
-                        <th>URL</th>
-                    </tr>
-                </thead>
-
-                <tbody id="historyFindings">
-                </tbody>
-
-            </table>
-
-        </div>
-
-    </div>
+<div id="investigationList"></div>
 
 </section>
 
 
 <section id="findings" class="hidden">
 
-    <div class="eyebrow">
-        Intelligence
-    </div>
+<h2>Findings</h2>
 
-    <div class="title">
-        Findings
-    </div>
+<input id="findingSearch"
+placeholder="Search">
 
-    <div class="panel">
+<select id="findingType">
+<option value="">All</option>
+<option value="username">username</option>
+<option value="email">email</option>
+<option value="domain">domain</option>
+<option value="ip">ip</option>
+<option value="url">url</option>
+<option value="pgp">pgp</option>
+<option value="crypto">crypto</option>
+<option value="infrastructure">infrastructure</option>
+</select>
 
-        <div class="toolbar">
+<button onclick="loadFindings()">Search</button>
 
-            <div>
-                <span class="muted">
-                    Total findings:
-                </span>
-
-                <span
-                    class="finding-count"
-                    id="findingsTotal">
-                    0
-                </span>
-            </div>
-
-            <button
-                class="secondary"
-                onclick="loadFindings()">
-                Refresh
-            </button>
-
-        </div>
-
-        <div
-            class="row"
-            style="margin-bottom:14px">
-
-            <input
-                id="findingSearch"
-                placeholder="Search finding value..."
-                onkeydown="if(event.key==='Enter')loadFindings()"
-            >
-
-            <select
-                id="findingTypeFilter"
-                onchange="loadFindings()">
-
-                <option value="">All types</option>
-                <option value="username">username</option>
-                <option value="email">email</option>
-                <option value="domain">domain</option>
-                <option value="ip">ip</option>
-                <option value="url">url</option>
-                <option value="pgp">pgp</option>
-                <option value="crypto">crypto</option>
-                <option value="infrastructure">infrastructure</option>
-
-            </select>
-
-            <button
-                class="primary"
-                onclick="loadFindings()">
-                Search
-            </button>
-
-        </div>
-
-        <div class="tablewrap">
-
-            <table class="table">
-
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>Value</th>
-                        <th>Source</th>
-                        <th>Confidence</th>
-                        <th>Source URL</th>
-                        <th>Investigation</th>
-                    </tr>
-                </thead>
-
-                <tbody id="findingsTable">
-                </tbody>
-
-            </table>
-
-        </div>
-
-    </div>
-
-</section>
-
-
-<section id="alerts" class="hidden">
-
-    <div class="eyebrow">
-        Monitoring
-    </div>
-
-    <div class="title">
-        Alerts
-    </div>
-
-    <div class="panel">
-
-        <div class="toolbar">
-
-            <span class="muted">
-                Monitoring alerts
-            </span>
-
-            <button
-                class="secondary"
-                onclick="loadAlerts()">
-                Refresh
-            </button>
-
-        </div>
-
-        <div class="tablewrap">
-
-            <table class="table">
-
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>Message</th>
-                        <th>Confidence</th>
-                        <th>Time</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-
-                <tbody id="alertTable">
-                </tbody>
-
-            </table>
-
-        </div>
-
-    </div>
+<div id="findingList"></div>
 
 </section>
 
 
 <section id="watch" class="hidden">
 
-    <div class="eyebrow">
-        Continuous Monitoring
-    </div>
+<h2>Watchlist</h2>
 
-    <div class="title">
-        Watchlist
-    </div>
+<input id="watchActor"
+placeholder="Actor ID">
 
-    <div class="panel">
+<input id="watchInterval"
+type="number"
+value="60"
+min="5">
 
-        <div class="toolbar">
+<button onclick="addWatch()">Add</button>
+<button onclick="loadWatchlist()">Refresh</button>
 
-            <span class="muted">
-                Tracked actors
-            </span>
+<div id="watchList"></div>
 
-            <button
-                class="secondary"
-                onclick="loadWatchlist()">
-                Refresh
-            </button>
+</section>
 
-        </div>
 
-        <div class="tablewrap">
+<section id="alerts" class="hidden">
 
-            <table class="table">se 
+<h2>Alerts</h2>
 
-                <thead>
-                    <tr>
-                        <th>Watch ID</th>
-                        <th>Actor</th>
-                        <th>Interval</th>
-                        <th>Enabled</th>
-                        <th>Created</th>
-                    </tr>
-                </thead>
+<button onclick="loadAlerts()">Refresh</button>
 
-                <tbody id="watchTable">
-                </tbody>
+<div id="alertList"></div>
 
-            </table>
+</section>
 
-        </div>
 
-    </div>
+<section id="persona" class="hidden">
+
+<h2>Persona / Stylometry</h2>
+
+<textarea
+id="personaPosts"
+rows="10"
+cols="60"
+placeholder='Enter JSON array of posts, example:
+[{"text":"hello world"},{"text":"another post"}]'>
+</textarea>
+
+<br>
+
+<button onclick="analyzePersona()">Analyze</button>
+
+<div class="card">
+<pre id="personaResult"></pre>
+</div>
+
+<h3>Compare Personas</h3>
+
+<textarea
+id="personaA"
+rows="6"
+cols="50"
+placeholder="Persona A JSON"></textarea>
+
+<textarea
+id="personaB"
+rows="6"
+cols="50"
+placeholder="Persona B JSON"></textarea>
+
+<br>
+
+<button onclick="comparePersona()">Compare</button>
+
+<pre id="compareResult"></pre>
 
 </section>
 
 </main>
-</div>
-    <script>  
-    const $ = (id) => document.getElementById(id);
 
-let currentJobId = null;
-let currentInvestigationId = localStorage.getItem("currentInvestigationId") || null;
-let currentActorId = localStorage.getItem("currentActorId") || null;
-let jobSocket = null;
-let pollTimer = null;
+
+<script>
+
+let currentJobId=null;
+let currentInvestigationId=null;
 
 
 /* =========================
-   API HELPER
+   BASIC API
 ========================= */
 
-async function api(url, options = {}) {
-    const response = await fetch(url, {
-        headers: {
-            "Content-Type": "application/json",
-            ...(options.headers || {})
+async function api(url,options={}){
+
+    const response=await fetch(url,{
+        headers:{
+            "Content-Type":"application/json"
         },
         ...options
     });
 
-    let data = null;
+    const text=await response.text();
 
-    try {
-        data = await response.json();
-    } catch (_) {
-        data = null;
+    let data;
+
+    try{
+        data=JSON.parse(text);
+    }catch{
+        data=text;
     }
 
-    if (!response.ok) {
-        const message =
+    if(!response.ok){
+        throw new Error(
             data?.detail ||
             data?.error ||
-            `Request failed (${response.status})`;
-
-        throw new Error(message);
+            "Request failed"
+        );
     }
 
     return data;
@@ -1026,96 +274,196 @@ async function api(url, options = {}) {
 
 
 /* =========================
-   PAGE NAVIGATION
+   PAGE
 ========================= */
 
-function showPage(pageId, button) {
-    // Actual HTML uses section.hidden, not .page/.active
-    document.querySelectorAll("main > section").forEach(section => {
-        section.classList.add("hidden");
-    });
+function page(id){
 
-    const page = $(pageId);
+    document.querySelectorAll("main section")
+        .forEach(x=>x.classList.add("hidden"));
 
-    if (page) {
-        page.classList.remove("hidden");
-    }
+    document.getElementById(id)
+        .classList.remove("hidden");
 
-    // Actual navigation uses normal buttons
-    document.querySelectorAll("nav button").forEach(btn => {
-        btn.classList.remove("active");
-    });
+    if(id==="home") loadDashboard();
+    if(id==="history") loadInvestigations();
+    if(id==="findings") loadFindings();
+    if(id==="watch") loadWatchlist();
+    if(id==="alerts") loadAlerts();
+}
 
-    if (button) {
-        button.classList.add("active");
-    }
 
-    // Load page-specific data
-    if (pageId === "overview") {
-        loadStats();
-    }
+/* =========================
+   HEALTH
+========================= */
 
-    if (pageId === "history") {
-        loadInvestigations();
-    }
+async function health(){
 
-    if (pageId === "findings") {
-        loadFindings();
-    }
+    try{
 
-    if (pageId === "alerts") {
-        loadAlerts();
-    }
+        const data=await api("/api/health");
 
-    if (pageId === "watch") {
-        loadWatchlist();
+        document.getElementById("health")
+            .textContent="Backend: ONLINE";
+
+    }catch(error){
+
+        document.getElementById("health")
+            .textContent="Backend: OFFLINE";
+
     }
 }
 
 
 /* =========================
-   TERMINAL
+   CRAWLER
 ========================= */
 
-function terminalLog(message, type = "info") {
-    const terminal = $("terminal");
+async function startCrawl(){
 
-    if (!terminal) {
+    const url=document
+        .getElementById("crawlUrl")
+        .value.trim();
+
+    const target=document
+        .getElementById("crawlTarget")
+        .value.trim();
+
+    if(!url){
+        alert("Enter a URL");
         return;
     }
 
-    const time = new Date().toLocaleTimeString();
+    try{
 
-    const line = document.createElement("div");
+        const result=await api("/api/crawl",{
+            method:"POST",
+            body:JSON.stringify({
+                urls:[url],
+                target:target || null,
+                workers:3
+            })
+        });
 
-    line.className = `terminal-line ${type}`;
+        currentJobId=result.job_id;
+        currentInvestigationId=result.investigation_id;
 
-    line.textContent = `[${time}] ${message}`;
+        document.getElementById("jobStatus")
+            .textContent="Crawler started: "+result.job_id;
 
-    terminal.appendChild(line);
+        monitorJob(result.job_id);
 
-    terminal.scrollTop = terminal.scrollHeight;
+    }catch(error){
+
+        alert(error.message);
+
+    }
 }
 
 
-function overviewLog(message, type = "info") {
-    const terminal = $("overviewTerminal");
+/* =========================
+   MANUAL OSINT
+========================= */
 
-    if (!terminal) {
+async function startOSINT(){
+
+    const target=document
+        .getElementById("manualTarget")
+        .value.trim();
+
+    const type=document
+        .getElementById("manualType")
+        .value;
+
+    if(!target){
+        alert("Enter a target");
         return;
     }
 
-    const time = new Date().toLocaleTimeString();
+    try{
 
-    const line = document.createElement("div");
+        const result=await api("/api/investigate",{
+            method:"POST",
+            body:JSON.stringify({
+                target:target,
+                target_type:type,
+                notes:null
+            })
+        });
 
-    line.className = `terminal-line ${type}`;
+        currentJobId=result.job_id;
+        currentInvestigationId=result.investigation_id;
 
-    line.textContent = `[${time}] ${message}`;
+        document.getElementById("jobStatus")
+            .textContent="OSINT started: "+result.job_id;
 
-    terminal.appendChild(line);
+        monitorJob(result.job_id);
 
-    terminal.scrollTop = terminal.scrollHeight;
+    }catch(error){
+
+        alert(error.message);
+
+    }
+}
+
+
+/* =========================
+   JOB MONITOR
+========================= */
+
+async function monitorJob(jobId){
+
+    const terminal=document
+        .getElementById("terminal");
+
+    terminal.textContent="Job "+jobId+" started...\n";
+
+    const timer=setInterval(async()=>{
+
+        try{
+
+            const data=await api(
+                "/api/jobs/"+jobId
+            );
+
+            terminal.textContent=
+                JSON.stringify(
+                    data.events || [],
+                    null,
+                    2
+                );
+
+            document.getElementById("jobStatus")
+                .textContent=
+                "Status: "+data.job.status;
+
+            if(
+                data.job.status==="completed" ||
+                data.job.status==="failed"
+            ){
+
+                clearInterval(timer);
+
+                if(currentInvestigationId){
+                    loadCurrentInvestigation();
+                }
+
+                loadDashboard();
+
+            }
+
+        }catch(error){
+
+            clearInterval(timer);
+
+            terminal.textContent=
+                "Job monitor error: "+
+                error.message;
+
+        }
+
+    },1500);
+
 }
 
 
@@ -1123,1166 +471,518 @@ function overviewLog(message, type = "info") {
    CURRENT INVESTIGATION
 ========================= */
 
-function setCurrentInvestigation(investigationId, actorId = null) {
-    currentInvestigationId = investigationId;
-    currentActorId = actorId;
+async function loadCurrentInvestigation(){
 
-    if (investigationId) {
-        localStorage.setItem(
-            "currentInvestigationId",
-            investigationId
-        );
-    }
-
-    if (actorId) {
-        localStorage.setItem(
-            "currentActorId",
-            actorId
-        );
-    }
-
-    loadCurrentInvestigation();
-}
-
-
-/* =========================
-   START CRAWL
-========================= */
-
-async function startCrawl() {
-    const urlInput = $("url");
-    const targetInput = $("target");
-
-    const urlText = urlInput?.value.trim() || "";
-    const target = targetInput?.value.trim() || "";
-
-    if (!urlText) {
-        terminalLog("Please enter at least one URL.", "error");
+    if(!currentInvestigationId)
         return;
-    }
 
-    const urls = urlText
-        .split(/\r?\n/)
-        .map(url => url.trim())
-        .filter(Boolean);
+    try{
 
-    const button = document.querySelector(
-        'button[onclick="startCrawl()"]'
-    );
-
-    if (button) {
-        button.disabled = true;
-    }
-
-    terminalLog("Starting crawler...", "info");
-
-    try {
-        const result = await api("/api/crawl", {
-            method: "POST",
-            body: JSON.stringify({
-                urls: urls,
-                target: target || null,
-                workers: 3
-            })
-        });
-
-        currentJobId = result.job_id;
-
-        setCurrentInvestigation(
-            result.investigation_id,
-            result.actor_id
+        const data=await api(
+            "/api/investigations/"+
+            currentInvestigationId
         );
 
-        terminalLog(
-            `Investigation created: ${result.investigation_id}`,
-            "success"
-        );
+        document.getElementById(
+            "currentInvestigation"
+        ).textContent=
+            JSON.stringify(data,null,2);
 
-        terminalLog(
-            `Crawler job started: ${result.job_id}`,
-            "success"
-        );
+    }catch(error){
 
-        updateJobStatus("RUNNING");
+        document.getElementById(
+            "currentInvestigation"
+        ).textContent=
+            error.message;
 
-        followJob(result.job_id);
-
-    } catch (error) {
-        terminalLog(
-            `Crawler error: ${error.message}`,
-            "error"
-        );
-
-        updateJobStatus("ERROR");
-
-    } finally {
-        if (button) {
-            button.disabled = false;
-        }
     }
 }
 
 
 /* =========================
-   START MANUAL OSINT
+   INVESTIGATIONS
 ========================= */
 
-async function startManual() {
-    const targetInput = $("manual");
-    const typeInput = $("type");
+async function loadInvestigations(){
 
-    const target = targetInput?.value.trim() || "";
-    const targetType = typeInput?.value || "other";
+    try{
 
-    if (!target) {
-        terminalLog(
-            "Please enter a target.",
-            "error"
-        );
-        return;
-    }
-
-    const button = document.querySelector(
-        'button[onclick="startManual()"]'
-    );
-
-    if (button) {
-        button.disabled = true;
-    }
-
-    terminalLog(
-        `Starting OSINT investigation for ${target}...`,
-        "info"
-    );
-
-    try {
-        const result = await api("/api/investigate", {
-            method: "POST",
-            body: JSON.stringify({
-                target: target,
-                target_type: targetType,
-                notes: null
-            })
-        });
-
-        currentJobId = result.job_id;
-
-        setCurrentInvestigation(
-            result.investigation_id,
-            result.actor_id
+        const data=await api(
+            "/api/investigations"
         );
 
-        terminalLog(
-            `Investigation created: ${result.investigation_id}`,
-            "success"
-        );
+        const list=document
+            .getElementById("investigationList");
 
-        terminalLog(
-            `OSINT job started: ${result.job_id}`,
-            "success"
-        );
+        list.innerHTML="";
 
-        updateJobStatus("RUNNING");
+        const items=Array.isArray(data)
+            ? data
+            : data.investigations || [];
 
-        followJob(result.job_id);
-
-    } catch (error) {
-        terminalLog(
-            `OSINT error: ${error.message}`,
-            "error"
-        );
-
-        updateJobStatus("ERROR");
-
-    } finally {
-        if (button) {
-            button.disabled = false;
-        }
-    }
-}
-
-
-/* =========================
-   JOB STATUS
-========================= */
-
-function updateJobStatus(status) {
-    const element = $("jobStatus");
-
-    if (!element) {
-        return;
-    }
-
-    element.textContent = status;
-
-    element.className = "";
-
-    const normalized = String(status).toLowerCase();
-
-    if (normalized === "completed" || normalized === "success") {
-        element.classList.add("success");
-    } else if (
-        normalized === "failed" ||
-        normalized === "error"
-    ) {
-        element.classList.add("error");
-    } else if (normalized === "running") {
-        element.classList.add("running");
-    }
-}
-
-
-/* =========================
-   JOB MONITORING
-========================= */
-
-function followJob(jobId) {
-    currentJobId = jobId;
-
-    // Close old socket
-    if (jobSocket) {
-        try {
-            jobSocket.close();
-        } catch (_) {}
-        jobSocket = null;
-    }
-
-    // Stop old polling
-    if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-    }
-
-    const protocol =
-        window.location.protocol === "https:"
-            ? "wss:"
-            : "ws:";
-
-    const wsUrl =
-        `${protocol}//${window.location.host}/ws/jobs/${jobId}`;
-
-    try {
-        jobSocket = new WebSocket(wsUrl);
-
-        jobSocket.onopen = () => {
-            terminalLog(
-                "Connected to live job monitor.",
-                "success"
-            );
-        };
-
-        jobSocket.onmessage = event => {
-            try {
-                const data = JSON.parse(event.data);
-
-                handleJobEvent(data);
-            } catch (error) {
-                terminalLog(
-                    "Received invalid job event.",
-                    "error"
-                );
-            }
-        };
-
-        jobSocket.onerror = () => {
-            terminalLog(
-                "Live monitor unavailable. Switching to polling.",
-                "error"
-            );
-
-            startJobPolling(jobId);
-        };
-
-        jobSocket.onclose = () => {
-            // Polling will keep status updated if the socket closes.
-            startJobPolling(jobId);
-        };
-
-    } catch (error) {
-        terminalLog(
-            "WebSocket unavailable. Using polling.",
-            "error"
-        );
-
-        startJobPolling(jobId);
-    }
-}
-
-
-function startJobPolling(jobId) {
-    if (pollTimer) {
-        return;
-    }
-
-    pollTimer = setInterval(
-        () => pollJob(jobId),
-        1500
-    );
-
-    pollJob(jobId);
-}
-
-
-async function pollJob(jobId) {
-    try {
-        const result = await api(
-            `/api/jobs/${jobId}`
-        );
-
-        if (result.job) {
-            handleJobEvent({
-                event_type: "job_status",
-                status: result.job.status,
-                message: result.job.message || "",
-                payload: result.job
-            });
+        if(!items.length){
+            list.textContent="No investigations";
+            return;
         }
 
-        if (
-            result.job?.status === "completed" ||
-            result.job?.status === "failed" ||
-            result.job?.status === "error"
-        ) {
-            if (pollTimer) {
-                clearInterval(pollTimer);
-                pollTimer = null;
-            }
-
-            await loadCurrentInvestigation();
-            await loadStats();
-        }
-
-    } catch (error) {
-        console.error("Job polling failed:", error);
-    }
-}
-
-
-/* =========================
-   JOB EVENTS
-========================= */
-
-function handleJobEvent(event) {
-    const status =
-        event.status ||
-        event.payload?.status ||
-        "";
-
-    const message =
-        event.message ||
-        event.payload?.message ||
-        "";
-
-    if (message) {
-        terminalLog(
-            message,
-            String(status).toLowerCase() === "error"
-                ? "error"
-                : "info"
-        );
-    }
-
-    if (status) {
-        updateJobStatus(status);
-    }
-
-    if (
-        String(status).toLowerCase() === "completed"
-    ) {
-        terminalLog(
-            "Job completed successfully.",
-            "success"
-        );
-
-        loadCurrentInvestigation();
-        loadStats();
-    }
-
-    if (
-        ["failed", "error"].includes(
-            String(status).toLowerCase()
-        )
-    ) {
-        terminalLog(
-            "Job failed.",
-            "error"
-        );
-    }
-}
-
-
-/* =========================
-   LOAD CURRENT INVESTIGATION
-========================= */
-
-async function loadCurrentInvestigation() {
-    if (!currentInvestigationId) {
-        return;
-    }
-
-    try {
-        const data = await api(
-            `/api/investigations/${encodeURIComponent(
-                currentInvestigationId
-            )}`
-        );
-
-        renderCurrentInvestigation(data);
-
-    } catch (error) {
-        console.error(
-            "Failed to load current investigation:",
-            error
-        );
-    }
-}
-
-
-/* =========================
-   RENDER CURRENT FINDINGS
-========================= */
-
-function renderCurrentInvestigation(data) {
-    const findings =
-        data.findings ||
-        data.result?.findings ||
-        [];
-
-    const count = $("currentFindingCount");
-
-    if (count) {
-        count.textContent = findings.length;
-    }
-
-    const tbody = $("currentFindings");
-
-    if (!tbody) {
-        return;
-    }
-
-    tbody.innerHTML = "";
-
-    if (!findings.length) {
-        const row = document.createElement("tr");
-
-        row.innerHTML = `
-            <td colspan="6">
-                No findings yet.
-            </td>
-        `;
-
-        tbody.appendChild(row);
-
-        return;
-    }
-
-    findings.forEach((finding, index) => {
-        const row = document.createElement("tr");
-
-        const confidence =
-            finding.confidence !== undefined &&
-            finding.confidence !== null
-                ? `${Math.round(
-                    Number(finding.confidence) * 100
-                  )}%`
-                : "—";
-
-        row.innerHTML = `
-            <td>${escapeHtml(
-                finding.finding_type || "other"
-            )}</td>
-
-            <td>${escapeHtml(
-                finding.value || "—"
-            )}</td>
-
-            <td>${escapeHtml(
-                finding.source || "—"
-            )}</td>
-
-            <td>${escapeHtml(
-                finding.source_url || "—"
-            )}</td>
-
-            <td>${escapeHtml(
-const $ = (id) => document.getElementById(id);
-
-let currentJobId = null;
-let currentInvestigationId = localStorage.getItem("currentInvestigationId") || null;
-let currentActorId = localStorage.getItem("currentActorId") || null;
-let jobSocket = null;
-let pollTimer = null;
-
-
-/* =========================
-   API HELPER
-========================= */
-
-async function api(url, options = {}) {
-    const response = await fetch(url, {
-        headers: {
-            "Content-Type": "application/json",
-            ...(options.headers || {})
-        },
-        ...options
-    });
-
-    let data = null;
-
-    try {
-        data = await response.json();
-    } catch (_) {
-        data = null;
-    }
-
-    if (!response.ok) {
-        const message =
-            data?.detail ||
-            data?.error ||
-            `Request failed (${response.status})`;
-
-        throw new Error(message);
-    }
-
-    return data;
-}
-
-
-/* =========================
-   PAGE NAVIGATION
-========================= */
-
-function showPage(pageId, button) {
-    // Actual HTML uses section.hidden, not .page/.active
-    document.querySelectorAll("main > section").forEach(section => {
-        section.classList.add("hidden");
-    });
-
-    const page = $(pageId);
-
-    if (page) {
-        page.classList.remove("hidden");
-    }
-
-    // Actual navigation uses normal buttons
-    document.querySelectorAll("nav button").forEach(btn => {
-        btn.classList.remove("active");
-    });
-
-    if (button) {
-        button.classList.add("active");
-    }
-
-    // Load page-specific data
-    if (pageId === "overview") {
-        loadStats();
-    }
-
-    if (pageId === "history") {
-        loadInvestigations();
-    }
-
-    if (pageId === "findings") {
-        loadFindings();
-    }
-
-    if (pageId === "alerts") {
-        loadAlerts();
-    }
-
-    if (pageId === "watch") {
-        loadWatchlist();
-    }
-}
-
-
-/* =========================
-   TERMINAL
-========================= */
-
-function terminalLog(message, type = "info") {
-    const terminal = $("terminal");
-
-    if (!terminal) {
-        return;
-    }
-
-    const time = new Date().toLocaleTimeString();
-
-    const line = document.createElement("div");
-
-    line.className = `terminal-line ${type}`;
-
-    line.textContent = `[${time}] ${message}`;
-
-    terminal.appendChild(line);
-
-    terminal.scrollTop = terminal.scrollHeight;
-}
-
-
-function overviewLog(message, type = "info") {
-    const terminal = $("overviewTerminal");
-
-    if (!terminal) {
-        return;
-    }
-
-    const time = new Date().toLocaleTimeString();
-
-    const line = document.createElement("div");
-
-    line.className = `terminal-line ${type}`;
-
-    line.textContent = `[${time}] ${message}`;
-
-    terminal.appendChild(line);
-
-    terminal.scrollTop = terminal.scrollHeight;
-}
-
-
-/* =========================
-   CURRENT INVESTIGATION
-========================= */
-
-function setCurrentInvestigation(investigationId, actorId = null) {
-    currentInvestigationId = investigationId;
-    currentActorId = actorId;
-
-    if (investigationId) {
-        localStorage.setItem(
-            "currentInvestigationId",
-            investigationId
-        );
-    }
-
-    if (actorId) {
-        localStorage.setItem(
-            "currentActorId",
-            actorId
-        );
-    }
-
-    loadCurrentInvestigation();
-}
-
-
-/* =========================
-   START CRAWL
-========================= */
-
-async function startCrawl() {
-    const urlInput = $("url");
-    const targetInput = $("target");
-
-    const urlText = urlInput?.value.trim() || "";
-    const target = targetInput?.value.trim() || "";
-
-    if (!urlText) {
-        terminalLog("Please enter at least one URL.", "error");
-        return;
-    }
-
-    const urls = urlText
-        .split(/\r?\n/)
-        .map(url => url.trim())
-        .filter(Boolean);
-
-    const button = document.querySelector(
-        'button[onclick="startCrawl()"]'
-    );
-
-    if (button) {
-        button.disabled = true;
-    }
-
-    terminalLog("Starting crawler...", "info");
-
-    try {
-        const result = await api("/api/crawl", {
-            method: "POST",
-            body: JSON.stringify({
-                urls: urls,
-                target: target || null,
-                workers: 3
-            })
-        });
-
-        currentJobId = result.job_id;
-
-        setCurrentInvestigation(
-            result.investigation_id,
-            result.actor_id
-        );
-
-        terminalLog(
-            `Investigation created: ${result.investigation_id}`,
-            "success"
-        );
-
-        terminalLog(
-            `Crawler job started: ${result.job_id}`,
-            "success"
-        );
-
-        updateJobStatus("RUNNING");
-
-        followJob(result.job_id);
-
-    } catch (error) {
-        terminalLog(
-            `Crawler error: ${error.message}`,
-            "error"
-        );
-
-        updateJobStatus("ERROR");
-
-    } finally {
-        if (button) {
-            button.disabled = false;
-        }
-    }
-}
-
-
-/* =========================
-   START MANUAL OSINT
-========================= */
-
-async function startManual() {
-    const targetInput = $("manual");
-    const typeInput = $("type");
-
-    const target = targetInput?.value.trim() || "";
-    const targetType = typeInput?.value || "other";
-
-    if (!target) {
-        terminalLog(
-            "Please enter a target.",
-            "error"
-        );
-        return;
-    }
-
-    const button = document.querySelector(
-        'button[onclick="startManual()"]'
-    );
-
-    if (button) {
-        button.disabled = true;
-    }
-
-    terminalLog(
-        `Starting OSINT investigation for ${target}...`,
-        "info"
-    );
-
-    try {
-        const result = await api("/api/investigate", {
-            method: "POST",
-            body: JSON.stringify({
-                target: target,
-                target_type: targetType,
-                notes: null
-            })
-        });
-
-        currentJobId = result.job_id;
-
-        setCurrentInvestigation(
-            result.investigation_id,
-            result.actor_id
-        );
-
-        terminalLog(
-            `Investigation created: ${result.investigation_id}`,
-            "success"
-        );
-
-        terminalLog(
-            `OSINT job started: ${result.job_id}`,
-            "success"
-        );
-
-        updateJobStatus("RUNNING");
-
-        followJob(result.job_id);
-
-    } catch (error) {
-        terminalLog(
-            `OSINT error: ${error.message}`,
-            "error"
-        );
-
-        updateJobStatus("ERROR");
-
-    } finally {
-        if (button) {
-            button.disabled = false;
-        }
-    }
-}
-
-
-/* =========================
-   JOB STATUS
-========================= */
-
-function updateJobStatus(status) {
-    const element = $("jobStatus");
-
-    if (!element) {
-        return;
-    }
-
-    element.textContent = status;
-
-    element.className = "";
-
-    const normalized = String(status).toLowerCase();
-
-    if (normalized === "completed" || normalized === "success") {
-        element.classList.add("success");
-    } else if (
-        normalized === "failed" ||
-        normalized === "error"
-    ) {
-        element.classList.add("error");
-    } else if (normalized === "running") {
-        element.classList.add("running");
-    }
-}
-
-
-/* =========================
-   JOB MONITORING
-========================= */
-
-function followJob(jobId) {
-    currentJobId = jobId;
-
-    // Close old socket
-    if (jobSocket) {
-        try {
-            jobSocket.close();
-        } catch (_) {}
-        jobSocket = null;
-    }
-
-    // Stop old polling
-    if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-    }
-
-    const protocol =
-        window.location.protocol === "https:"
-            ? "wss:"
-            : "ws:";
-
-    const wsUrl =
-        `${protocol}//${window.location.host}/ws/jobs/${jobId}`;
-
-    try {
-        jobSocket = new WebSocket(wsUrl);
-
-        jobSocket.onopen = () => {
-            terminalLog(
-                "Connected to live job monitor.",
-                "success"
-            );
-        };
-
-        jobSocket.onmessage = event => {
-            try {
-                const data = JSON.parse(event.data);
-
-                handleJobEvent(data);
-            } catch (error) {
-                terminalLog(
-                    "Received invalid job event.",
-                    "error"
-                );
-            }
-        };
-
-        jobSocket.onerror = () => {
-            terminalLog(
-                "Live monitor unavailable. Switching to polling.",
-                "error"
-            );
-
-            startJobPolling(jobId);
-        };
-
-        jobSocket.onclose = () => {
-            // Polling will keep status updated if the socket closes.
-            startJobPolling(jobId);
-        };
-
-    } catch (error) {
-        terminalLog(
-            "WebSocket unavailable. Using polling.",
-            "error"
-        );
-
-        startJobPolling(jobId);
-    }
-}
-
-
-function startJobPolling(jobId) {
-    if (pollTimer) {
-        return;
-    }
-
-    pollTimer = setInterval(
-        () => pollJob(jobId),
-        1500
-    );
-
-    pollJob(jobId);
-}
-
-
-async function pollJob(jobId) {
-    try {
-        const result = await api(
-            `/api/jobs/${jobId}`
-        );
-
-        if (result.job) {
-            handleJobEvent({
-                event_type: "job_status",
-                status: result.job.status,
-                message: result.job.message || "",
-                payload: result.job
-            });
-        }
-
-        if (
-            result.job?.status === "completed" ||
-            result.job?.status === "failed" ||
-            result.job?.status === "error"
-        ) {
-            if (pollTimer) {
-                clearInterval(pollTimer);
-                pollTimer = null;
-            }
-
-            await loadCurrentInvestigation();
-            await loadStats();
-        }
-
-    } catch (error) {
-        console.error("Job polling failed:", error);
-    }
-}
-
-
-/* =========================
-   JOB EVENTS
-========================= */
-
-function handleJobEvent(event) {
-    const status =
-        event.status ||
-        event.payload?.status ||
-        "";
-
-    const message =
-        event.message ||
-        event.payload?.message ||
-        "";
-
-    if (message) {
-        terminalLog(
-            message,
-            String(status).toLowerCase() === "error"
-                ? "error"
-                : "info"
-        );
-    }
-
-    if (status) {
-        updateJobStatus(status);
-    }
-
-    if (
-        String(status).toLowerCase() === "completed"
-    ) {
-        terminalLog(
-            "Job completed successfully.",
-            "success"
-        );
-
-        loadCurrentInvestigation();
-        loadStats();
-    }
-
-    if (
-        ["failed", "error"].includes(
-            String(status).toLowerCase()
-        )
-    ) {
-        terminalLog(
-            "Job failed.",
-            "error"
-        );
-    }
-}
-
-
-/* =========================
-   LOAD CURRENT INVESTIGATION
-========================= */
-
-async function loadCurrentInvestigation() {
-    if (!currentInvestigationId) {
-        return;
-    }
-
-    try {
-        const data = await api(
-            `/api/investigations/${encodeURIComponent(
-                currentInvestigationId
-            )}`
-        );
-
-        renderCurrentInvestigation(data);
-
-    } catch (error) {
-        console.error(
-            "Failed to load current investigation:",
-            error
-        );
-    }
-}
-
-
-/* =========================
-   RENDER CURRENT FINDINGS
-========================= */
-
-function renderCurrentInvestigation(data) {
-    const findings =
-        data.findings ||
-        data.result?.findings ||
-        [];
-
-    const count = $("currentFindingCount");
-
-    if (count) {
-        count.textContent = findings.length;
-    }
-
-    const tbody = $("currentFindings");
-
-    if (!tbody) {
-        return;
-    }
-
-    tbody.innerHTML = "";
-
-    if (!findings.length) {
-        const row = document.createElement("tr");
-
-        row.innerHTML = `
-            <td colspan="6">
-                No findings yet.
-            </td>
-        `;
-
-        tbody.appendChild(row);
-
-        return;
-    }
-
-    findings.forEach((finding, index) => {
-        const row = document.createElement("tr");
-
-        const confidence =
-            finding.confidence !== undefined &&
-            finding.confidence !== null
-                ? `${Math.round(
-                    Number(finding.confidence) * 100
-                  )}%`
-                : "—";
-
-        row.innerHTML = `
-            <td>${escapeHtml(
-                finding.finding_type || "other"
-            )}</td>
-
-            <td>${escapeHtml(
-                finding.value || "—"
-            )}</td>
-
-            <td>${escapeHtml(
-                finding.source || "—"
-            )}</td>
-
-            <td>${escapeHtml(
-                finding.source_url || "—"
-            )}</td>
-
-            <td>${escapeHtml(
-                confidence
-            )}</td>
-
-            <td>
-                <button
-                    type="button"
-                    onclick="viewFinding(${index})">
-                    View
+        items.forEach(item=>{
+
+            const div=document
+                .createElement("div");
+
+            div.className="card";
+
+            div.innerHTML=`
+                <b>${escapeHtml(
+                    item.investigation_id ||
+                    item.id ||
+                    ""
+                )}</b>
+                <br>
+                Target:
+                ${escapeHtml(
+                    item.target || ""
+                )}
+                <br>
+                Status:
+                ${escapeHtml(
+                    item.status || ""
+                )}
+                <br>
+                <button>
+                View
                 </button>
-            </td>
-        `;
+            `;
 
-        tbody.appendChild(row);
-    });
+            div.querySelector("button")
+                .onclick=()=>{
+                    currentInvestigationId=
+                        item.investigation_id ||
+                        item.id;
+
+                    page("investigate");
+                    loadCurrentInvestigation();
+                };
+
+            list.appendChild(div);
+
+        });
+
+    }catch(error){
+
+        alert(error.message);
+
+    }
 }
 
 
 /* =========================
-   FINDING VIEWER
+   FINDINGS
 ========================= */
 
-let currentFindingsCache = [];
+async function loadFindings(){
 
-function viewFinding(index) {
-    const finding = currentFindingsCache[index];
+    try{
 
-    if (!finding) {
+        const q=document
+            .getElementById("findingSearch")
+            .value.trim();
+
+        const type=document
+            .getElementById("findingType")
+            .value;
+
+        const params=new URLSearchParams();
+
+        if(q) params.set("q",q);
+        if(type) params.set(
+            "finding_type",
+            type
+        );
+
+        const data=await api(
+            "/api/findings?"+params
+        );
+
+        const list=document
+            .getElementById("findingList");
+
+        list.innerHTML="";
+
+        const items=Array.isArray(data)
+            ? data
+            : data.findings || [];
+
+        if(!items.length){
+            list.textContent="No findings";
+            return;
+        }
+
+        const table=document
+            .createElement("table");
+
+        table.innerHTML=`
+            <tr>
+                <th>Type</th>
+                <th>Value</th>
+                <th>Source</th>
+                <th>Confidence</th>
+            </tr>
+        `;
+
+        items.forEach(f=>{
+
+            const row=document
+                .createElement("tr");
+
+            row.innerHTML=`
+                <td>${escapeHtml(
+                    f.finding_type || ""
+                )}</td>
+                <td>${escapeHtml(
+                    f.value || ""
+                )}</td>
+                <td>${escapeHtml(
+                    f.source || ""
+                )}</td>
+                <td>${escapeHtml(
+                    f.confidence ?? ""
+                )}</td>
+            `;
+
+            table.appendChild(row);
+
+        });
+
+        list.appendChild(table);
+
+    }catch(error){
+
+        alert(error.message);
+
+    }
+}
+
+
+/* =========================
+   WATCHLIST
+========================= */
+
+async function addWatch(){
+
+    const actor=document
+        .getElementById("watchActor")
+        .value.trim();
+
+    const interval=Number(
+        document.getElementById(
+            "watchInterval"
+        ).value
+    );
+
+    if(!actor){
+        alert("Enter actor ID");
         return;
     }
 
-    alert(
-        JSON.stringify(
-            finding,
-            null,
-            2
-        )
-    );
+    try{
+
+        await api("/api/watchlist",{
+            method:"POST",
+            body:JSON.stringify({
+                actor_id:actor,
+                interval_minutes:interval
+            })
+        });
+
+        loadWatchlist();
+
+    }catch(error){
+
+        alert(error.message);
+
+    }
+}
+
+
+async function loadWatchlist(){
+
+    try{
+
+        const data=await api(
+            "/api/watchlist"
+        );
+
+        document.getElementById(
+            "watchList"
+        ).textContent=
+            JSON.stringify(data,null,2);
+
+    }catch(error){
+
+        document.getElementById(
+            "watchList"
+        ).textContent=
+            error.message;
+
+    }
 }
 
 
 /* =========================
-   HTML ESCAPING
+   ALERTS
 ========================= */
 
-function escapeHtml(value) {
+async function loadAlerts(){
+
+    try{
+
+        const data=await api(
+            "/api/alerts"
+        );
+
+        const list=document
+            .getElementById("alertList");
+
+        list.innerHTML="";
+
+        const items=Array.isArray(data)
+            ? data
+            : data.alerts || [];
+
+        if(!items.length){
+            list.textContent="No alerts";
+            return;
+        }
+
+        items.forEach(a=>{
+
+            const div=document
+                .createElement("div");
+
+            div.className="card";
+
+            div.innerHTML=`
+                <b>${escapeHtml(
+                    a.alert_type ||
+                    a.type ||
+                    "Alert"
+                )}</b>
+                <br>
+                ${escapeHtml(
+                    a.message || ""
+                )}
+                <br>
+                <button>Mark Read</button>
+            `;
+
+            const id=
+                a.alert_id ||
+                a.id;
+
+            div.querySelector("button")
+                .onclick=async()=>{
+
+                    if(!id) return;
+
+                    await api(
+                        "/api/alerts/"+id+"/read",
+                        {method:"POST"}
+                    );
+
+                    loadAlerts();
+                    loadDashboard();
+
+                };
+
+            list.appendChild(div);
+
+        });
+
+    }catch(error){
+
+        alert(error.message);
+
+    }
+}
+
+
+/* =========================
+   PERSONA
+========================= */
+
+async function analyzePersona(){
+
+    try{
+
+        const posts=JSON.parse(
+            document.getElementById(
+                "personaPosts"
+            ).value
+        );
+
+        const data=await api(
+            "/api/persona/analyze",
+            {
+                method:"POST",
+                body:JSON.stringify({
+                    posts:posts
+                })
+            }
+        );
+
+        document.getElementById(
+            "personaResult"
+        ).textContent=
+            JSON.stringify(
+                data,
+                null,
+                2
+            );
+
+    }catch(error){
+
+        alert(
+            "Invalid JSON or request failed: "+
+            error.message
+        );
+
+    }
+}
+
+
+async function comparePersona(){
+
+    try{
+
+        const a=JSON.parse(
+            document.getElementById(
+                "personaA"
+            ).value
+        );
+
+        const b=JSON.parse(
+            document.getElementById(
+                "personaB"
+            ).value
+        );
+
+        const data=await api(
+            "/api/persona/compare",
+            {
+                method:"POST",
+                body:JSON.stringify({
+                    persona_a:a,
+                    persona_b:b
+                })
+            }
+        );
+
+        document.getElementById(
+            "compareResult"
+        ).textContent=
+            JSON.stringify(
+                data,
+                null,
+                2
+            );
+
+    }catch(error){
+
+        alert(error.message);
+
+    }
+}
+
+
+/* =========================
+   DASHBOARD
+========================= */
+
+async function loadDashboard(){
+
+    try{
+
+        const investigations=
+            await api(
+                "/api/investigations"
+            );
+
+        const findings=
+            await api(
+                "/api/findings"
+            );
+
+        const watch=
+            await api(
+                "/api/watchlist"
+            );
+
+        const alerts=
+            await api(
+                "/api/alerts?unread=true"
+            );
+
+        document.getElementById(
+            "statInvestigations"
+        ).textContent=
+            Array.isArray(investigations)
+            ? investigations.length
+            : investigations.investigations?.length || 0;
+
+        document.getElementById(
+            "statFindings"
+        ).textContent=
+            Array.isArray(findings)
+            ? findings.length
+            : findings.findings?.length || 0;
+
+        document.getElementById(
+            "statWatch"
+        ).textContent=
+            Array.isArray(watch)
+            ? watch.length
+            : watch.watchlist?.length || 0;
+
+        document.getElementById(
+            "statAlerts"
+        ).textContent=
+            Array.isArray(alerts)
+            ? alerts.length
+            : alerts.alerts?.length || 0;
+
+    }catch(error){
+
+        console.error(error);
+
+    }
+}
+
+
+/* =========================
+   ESCAPE HTML
+========================= */
+
+function escapeHtml(value){
+
     return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}git
-    
-    </script>
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+
+}
+
+
+/* =========================
+   START
+========================= */
+
+health();
+loadDashboard();
+
+</script>
 
 </body>
 </html>
-  
