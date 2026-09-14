@@ -1,40 +1,2194 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Threat Actor Intelligence Console</title>
-<style>
-:root{--bg:#090b10;--panel:#11151d;--panel2:#171c25;--line:#252c38;--text:#e8edf5;--muted:#8d98aa;--accent:#64d8ff;--good:#62e6a7;--warn:#ffd166;--bad:#ff6b7a}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,system-ui,sans-serif}
-.layout{display:grid;grid-template-columns:240px 1fr;min-height:100vh}.side{border-right:1px solid var(--line);padding:22px 16px;background:#0d1016}.brand{font-weight:800;font-size:18px;margin-bottom:28px}.brand span{color:var(--accent)}
-.nav button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--muted);padding:12px;border-radius:9px;margin:3px 0}.nav button:hover,.nav .active{background:var(--panel2);color:var(--text)}
-main{padding:24px;max-width:1500px;width:100%;margin:auto}.top{display:flex;justify-content:space-between;gap:16px;align-items:center}.eyebrow{color:var(--accent);font-size:11px;letter-spacing:1.5px;text-transform:uppercase}.title{font-size:26px;font-weight:800;margin:5px 0 20px}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.card,.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px}.card{padding:16px}.metric{font-size:25px;font-weight:800;margin-top:8px}.muted{color:var(--muted)}.grid{display:grid;grid-template-columns:1.35fr .65fr;gap:14px;margin-top:14px}.panel{padding:16px}.panel h2{font-size:15px;margin:0 0 14px}.row{display:flex;gap:8px;flex-wrap:wrap}input,select{background:#0b0e14;border:1px solid var(--line);color:var(--text);padding:11px;border-radius:9px;flex:1;min-width:160px}button.primary{background:var(--accent);color:#061018;border:0;font-weight:800;padding:11px 15px;border-radius:9px}.terminal{background:#05070a;border:1px solid #202733;border-radius:10px;padding:13px;height:340px;overflow:auto;font-family:ui-monospace,SFMono-Regular,monospace;font-size:12px;line-height:1.65}.line{border-bottom:1px solid #151a22;padding:2px 0}.ok{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.tablewrap{overflow:auto;max-height:420px}.table{width:100%;border-collapse:collapse}.table th,.table td{text-align:left;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}.badge{padding:4px 7px;border-radius:999px;background:#1c2430;color:var(--muted);font-size:11px}.list{display:grid;gap:8px}.item{padding:11px;border:1px solid var(--line);border-radius:10px;background:#0d1118}.hidden{display:none}
-@media(max-width:900px){.layout{grid-template-columns:1fr}.side{display:none}.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
-</style></head><body>
-<div class="layout"><aside class="side"><div class="brand">THREAT<span>INTEL</span></div>
-<div class="muted" style="margin-bottom:12px">SIH26151 / Investigator</div>
-<div class="nav"><button class="active" onclick="show('overview',this)">Overview</button><button onclick="show('investigate',this)">New Investigation</button><button onclick="show('history',this)">Investigations</button><button onclick="show('alerts',this)">Alerts</button><button onclick="show('watch',this)">Watchlist</button></div></aside>
-<main>
-<section id="overview"><div class="top"><div><div class="eyebrow">Investigator Console</div><div class="title">Threat Actor Intelligence</div></div><span class="badge">LOCAL / CONTROLLED</span></div>
-<div class="cards"><div class="card"><div class="muted">Investigations</div><div class="metric" id="mInv">—</div></div><div class="card"><div class="muted">Findings</div><div class="metric" id="mFind">—</div></div><div class="card"><div class="muted">Tracked actors</div><div class="metric" id="mWatch">—</div></div><div class="card"><div class="muted">Unread alerts</div><div class="metric" id="mAlert">—</div></div></div>
-<div class="grid"><div class="panel"><h2>Live collection terminal</h2><div class="terminal" id="terminal"><div class="muted">Waiting for an investigation…</div></div></div>
-<div class="panel"><h2>Recent alerts</h2><div class="list" id="recentAlerts"></div></div></div></section>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
-<section id="investigate" class="hidden"><div class="eyebrow">Collection</div><div class="title">New Investigation</div>
-<div class="panel"><h2>Crawler target</h2><div class="row"><input id="url" placeholder="Authorized .onion / test URL"><input id="target" placeholder="Optional handle / username"><button class="primary" onclick="startCrawl()">Start crawl</button></div>
-<div class="muted" style="margin-top:10px">Use only sources you are authorized to collect or controlled test targets.</div></div>
-<div class="panel" style="margin-top:14px"><h2>Manual OSINT input</h2><div class="row"><input id="manual" placeholder="username, email, domain, IP, URL, PGP or wallet"><select id="type"><option>username</option><option>email</option><option>domain</option><option>ip</option><option>url</option><option>pgp</option><option>crypto</option></select><button class="primary" onclick="startManual()">Run OSINT</button></div></div>
+<title>SIH26151 Threat Intelligence Platform</title>
+
+<style>
+:root{
+    --bg:#080b10;
+    --panel:#10151d;
+    --panel2:#171e28;
+    --panel3:#0c1118;
+    --line:#27303c;
+    --text:#edf2f7;
+    --muted:#8d99a8;
+    --accent:#62d8ff;
+    --good:#62e6a7;
+    --warn:#ffd166;
+    --bad:#ff6678;
+}
+
+*{box-sizing:border-box}
+
+body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:14px;
+}
+
+button,input,select{font:inherit}
+
+button{cursor:pointer}
+
+.layout{
+    display:grid;
+    grid-template-columns:245px 1fr;
+    min-height:100vh;
+}
+
+.side{
+    border-right:1px solid var(--line);
+    background:#0b0f15;
+    padding:22px 15px;
+    position:sticky;
+    top:0;
+    height:100vh;
+}
+
+.brand{
+    font-size:19px;
+    font-weight:900;
+    letter-spacing:.4px;
+    margin-bottom:7px;
+}
+
+.brand span{color:var(--accent)}
+
+.project{
+    color:var(--muted);
+    font-size:11px;
+    margin-bottom:25px;
+}
+
+.nav button{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:transparent;
+    color:var(--muted);
+    border:0;
+    padding:12px 13px;
+    border-radius:9px;
+    margin:4px 0;
+}
+
+.nav button:hover,
+.nav button.active{
+    background:var(--panel2);
+    color:var(--text);
+}
+
+.nav button.active{
+    box-shadow:inset 3px 0 0 var(--accent);
+}
+
+main{
+    width:100%;
+    max-width:1550px;
+    margin:auto;
+    padding:25px;
+}
+
+.hidden{display:none!important}
+
+.top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:15px;
+}
+
+.eyebrow{
+    color:var(--accent);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+}
+
+.title{
+    font-size:27px;
+    font-weight:850;
+    margin:5px 0 21px;
+}
+
+.badge{
+    display:inline-block;
+    padding:5px 9px;
+    border-radius:999px;
+    background:#1a2330;
+    color:var(--muted);
+    font-size:11px;
+}
+
+.cards{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:12px;
+}
+
+.card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:13px;
+    padding:17px;
+}
+
+.metric{
+    font-size:27px;
+    font-weight:850;
+    margin-top:8px;
+}
+
+.muted{color:var(--muted)}
+
+.grid{
+    display:grid;
+    grid-template-columns:1.3fr .7fr;
+    gap:14px;
+    margin-top:14px;
+}
+
+.panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:17px;
+    margin-top:14px;
+}
+
+.panel h2{
+    font-size:15px;
+    margin:0 0 14px;
+}
+
+.row{
+    display:flex;
+    gap:9px;
+    flex-wrap:wrap;
+}
+
+input,select{
+    background:#090d13;
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:11px 12px;
+    border-radius:9px;
+    outline:none;
+    min-width:160px;
+    flex:1;
+}
+
+input:focus,select:focus{
+    border-color:var(--accent);
+}
+
+button.primary{
+    background:var(--accent);
+    color:#061018;
+    border:0;
+    border-radius:9px;
+    padding:11px 16px;
+    font-weight:850;
+}
+
+button.primary:hover{filter:brightness(1.08)}
+
+button.secondary{
+    background:var(--panel2);
+    color:var(--text);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:9px 13px;
+}
+
+button.secondary:hover{background:#202a37}
+
+.terminal{
+    background:#05070a;
+    border:1px solid #202833;
+    border-radius:10px;
+    padding:13px;
+    height:360px;
+    overflow:auto;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:12px;
+    line-height:1.7;
+}
+
+.line{
+    border-bottom:1px solid #121820;
+    padding:2px 0;
+    word-break:break-word;
+}
+
+.ok{color:var(--good)}
+.warn{color:var(--warn)}
+.bad{color:var(--bad)}
+.info{color:var(--accent)}
+
+.terminal-empty{color:#66717f}
+
+.tablewrap{
+    overflow:auto;
+    max-height:650px;
+}
+
+.table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.table th,.table td{
+    text-align:left;
+    padding:10px;
+    border-bottom:1px solid var(--line);
+    vertical-align:top;
+}
+
+.table th{
+    color:var(--muted);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.6px;
+    position:sticky;
+    top:0;
+    background:var(--panel);
+}
+
+.table td{white-space:nowrap}
+
+.value-cell{
+    max-width:360px;
+    white-space:normal!important;
+    overflow-wrap:anywhere;
+}
+
+.url-cell{
+    max-width:360px;
+    white-space:normal!important;
+    overflow-wrap:anywhere;
+}
+
+a{color:var(--accent)}
+
+.list{
+    display:grid;
+    gap:8px;
+}
+
+.item{
+    padding:11px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:#0d1219;
+}
+
+.item:hover{background:#111923}
+
+.empty{
+    color:var(--muted);
+    padding:18px 4px;
+}
+
+.finding-count{
+    color:var(--accent);
+    font-weight:800;
+}
+
+.toolbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+}
+
+.small{font-size:12px}
+
+.detail-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    margin-bottom:14px;
+}
+
+.detail{
+    background:var(--panel3);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:12px;
+}
+
+.detail-label{
+    color:var(--muted);
+    font-size:11px;
+    text-transform:uppercase;
+    margin-bottom:5px;
+}
+
+.detail-value{
+    font-weight:700;
+    overflow-wrap:anywhere;
+}
+
+.actions{
+    display:flex;
+    gap:7px;
+    flex-wrap:wrap;
+}
+
+.notice{
+    padding:11px 13px;
+    background:#101a22;
+    border:1px solid var(--line);
+    border-radius:9px;
+    color:var(--muted);
+    margin-bottom:14px;
+}
+
+.status-running{color:var(--warn)}
+.status-completed{color:var(--good)}
+.status-failed{color:var(--bad)}
+
+.confidence{font-weight:750}
+
+@media(max-width:1050px){
+    .cards{grid-template-columns:repeat(2,1fr)}
+    .grid{grid-template-columns:1fr}
+    .detail-grid{grid-template-columns:1fr}
+}
+
+@media(max-width:750px){
+    .layout{grid-template-columns:1fr}
+
+    .side{
+        position:static;
+        height:auto;
+        border-right:0;
+        border-bottom:1px solid var(--line);
+    }
+
+    .nav{
+        display:grid;
+        grid-template-columns:repeat(2,1fr);
+        gap:3px;
+    }
+
+    main{padding:15px}
+
+    .cards{grid-template-columns:1fr 1fr}
+
+    .title{font-size:22px}
+}
+</style>
+</head>
+
+<body>
+
+<div class="layout">
+
+<aside class="side">
+
+    <div class="brand">
+        THREAT<span>INTEL</span>
+    </div>
+
+    <div class="project">
+        SIH26151 / Investigator Console
+    </div>
+
+    <div class="nav">
+
+        <button class="active"
+                onclick="showPage('overview',this)">
+            Overview
+        </button>
+
+        <button onclick="showPage('investigate',this)">
+            New Investigation
+        </button>
+
+        <button onclick="showPage('history',this)">
+            Investigations
+        </button>
+
+        <button onclick="showPage('findings',this)">
+            Findings
+        </button>
+
+        <button onclick="showPage('alerts',this)">
+            Alerts
+        </button>
+
+        <button onclick="showPage('watch',this)">
+            Watchlist
+        </button>
+
+    </div>
+
+</aside>
+
+<main>
+
+<section id="overview">
+
+    <div class="top">
+
+        <div>
+            <div class="eyebrow">
+                Investigator Console
+            </div>
+
+            <div class="title">
+                Threat Actor Intelligence
+            </div>
+        </div>
+
+        <span class="badge">
+            LOCAL / CONTROLLED
+        </span>
+
+    </div>
+
+
+    <div class="cards">
+
+        <div class="card">
+            <div class="muted">Investigations</div>
+            <div class="metric" id="mInv">—</div>
+        </div>
+
+        <div class="card">
+            <div class="muted">Findings</div>
+            <div class="metric" id="mFind">—</div>
+        </div>
+
+        <div class="card">
+            <div class="muted">Tracked actors</div>
+            <div class="metric" id="mWatch">—</div>
+        </div>
+
+        <div class="card">
+            <div class="muted">Unread alerts</div>
+            <div class="metric" id="mAlert">—</div>
+        </div>
+
+    </div>
+
+
+    <div class="grid">
+
+        <div class="panel">
+
+            <h2>Latest execution</h2>
+
+            <div class="terminal"
+                 id="overviewTerminal">
+
+                <div class="terminal-empty">
+                    No active investigation.
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="panel">
+
+            <h2>Recent alerts</h2>
+
+            <div class="list"
+                 id="recentAlerts">
+
+                <div class="empty">
+                    Loading...
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
 </section>
 
-<section id="history" class="hidden"><div class="eyebrow">Case management</div><div class="title">Investigations</div><div class="panel tablewrap"><table class="table"><thead><tr><th>ID</th><th>Target</th><th>Type</th><th>Status</th><th>Created</th></tr></thead><tbody id="hist"></tbody></table></div></section>
-<section id="alerts" class="hidden"><div class="eyebrow">Monitoring</div><div class="title">Alerts</div><div class="panel tablewrap"><table class="table"><thead><tr><th>Type</th><th>Message</th><th>Confidence</th><th>Time</th></tr></thead><tbody id="alertTable"></tbody></table></div></section>
-<section id="watch" class="hidden"><div class="eyebrow">Continuous monitoring</div><div class="title">Watchlist</div><div class="panel tablewrap"><table class="table"><thead><tr><th>Watch ID</th><th>Actor</th><th>Interval</th><th>Enabled</th></tr></thead><tbody id="watchTable"></tbody></table></div></section>
-</main></div>
+
+<section id="investigate" class="hidden">
+
+    <div class="eyebrow">
+        Collection
+    </div>
+
+    <div class="title">
+        New Investigation
+    </div>
+
+    <div class="notice">
+        Use only public or authorized sources and controlled test
+        targets. The terminal below shows the live execution state.
+    </div>
+
+
+    <div class="panel">
+
+        <h2>Crawler target</h2>
+
+        <div class="row">
+
+            <input
+                id="url"
+                placeholder="Authorized .onion / test URL"
+            >
+
+            <input
+                id="target"
+                placeholder="Optional handle / username"
+            >
+
+            <button
+                class="primary"
+                onclick="startCrawl()"
+            >
+                Start Crawl
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <div class="panel">
+
+        <h2>Manual OSINT</h2>
+
+        <div class="row">
+
+            <input
+                id="manual"
+                placeholder="username, email, domain, IP, URL, PGP or wallet"
+            >
+
+            <select id="type">
+
+                <option value="username">username</option>
+                <option value="email">email</option>
+                <option value="domain">domain</option>
+                <option value="ip">ip</option>
+                <option value="url">url</option>
+                <option value="pgp">pgp</option>
+                <option value="crypto">crypto</option>
+                <option value="dns">dns</option>
+                <option value="other">other</option>
+
+            </select>
+
+            <button
+                class="primary"
+                onclick="startManual()"
+            >
+                Run OSINT
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <div class="panel">
+
+        <div class="toolbar">
+
+            <h2 style="margin:0">
+                Live Execution Terminal
+            </h2>
+
+            <span
+                class="badge"
+                id="jobStatus">
+                IDLE
+            </span>
+
+        </div>
+
+        <div
+            class="terminal"
+            id="terminal">
+
+            <div class="terminal-empty">
+                Submit a crawl or OSINT investigation to begin.
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div
+        class="panel"
+        id="currentInvestigationPanel"
+        style="display:none"
+    >
+
+        <div class="toolbar">
+
+            <h2 style="margin:0">
+                Investigation Findings
+            </h2>
+
+            <span
+                class="finding-count"
+                id="currentFindingCount">
+                0 findings
+            </span>
+
+        </div>
+
+        <div class="tablewrap">
+
+            <table class="table">
+
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Value</th>
+                        <th>Source</th>
+                        <th>Confidence</th>
+                        <th>Source URL</th>
+                    </tr>
+                </thead>
+
+                <tbody id="currentFindings">
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<section id="history" class="hidden">
+
+    <div class="eyebrow">
+        Case Management
+    </div>
+
+    <div class="title">
+        Investigations
+    </div>
+
+    <div class="panel">
+
+        <div class="toolbar">
+
+            <span class="muted">
+                Previous investigations
+            </span>
+
+            <button
+                class="secondary"
+                onclick="loadInvestigations()">
+                Refresh
+            </button>
+
+        </div>
+
+        <div class="tablewrap">
+
+            <table class="table">
+
+                <thead>
+                    <tr>
+                        <th>Investigation</th>
+                        <th>Target</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Source</th>
+                        <th>Created</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody id="hist">
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <div
+        class="panel"
+        id="historyDetail"
+        style="display:none"
+    >
+
+        <div class="toolbar">
+
+            <h2 style="margin:0">
+                Investigation Details
+            </h2>
+
+            <button
+                class="secondary"
+                onclick="closeHistoryDetail()">
+                Close
+            </button>
+
+        </div>
+
+        <div
+            class="detail-grid"
+            id="historyMeta">
+        </div>
+
+        <div class="tablewrap">
+
+            <table class="table">
+
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Value</th>
+                        <th>Source</th>
+                        <th>Confidence</th>
+                        <th>URL</th>
+                    </tr>
+                </thead>
+
+                <tbody id="historyFindings">
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<section id="findings" class="hidden">
+
+    <div class="eyebrow">
+        Intelligence
+    </div>
+
+    <div class="title">
+        Findings
+    </div>
+
+    <div class="panel">
+
+        <div class="toolbar">
+
+            <div>
+                <span class="muted">
+                    Total findings:
+                </span>
+
+                <span
+                    class="finding-count"
+                    id="findingsTotal">
+                    0
+                </span>
+            </div>
+
+            <button
+                class="secondary"
+                onclick="loadFindings()">
+                Refresh
+            </button>
+
+        </div>
+
+        <div
+            class="row"
+            style="margin-bottom:14px">
+
+            <input
+                id="findingSearch"
+                placeholder="Search finding value..."
+                onkeydown="if(event.key==='Enter')loadFindings()"
+            >
+
+            <select
+                id="findingTypeFilter"
+                onchange="loadFindings()">
+
+                <option value="">All types</option>
+                <option value="username">username</option>
+                <option value="email">email</option>
+                <option value="domain">domain</option>
+                <option value="ip">ip</option>
+                <option value="url">url</option>
+                <option value="pgp">pgp</option>
+                <option value="crypto">crypto</option>
+                <option value="infrastructure">infrastructure</option>
+
+            </select>
+
+            <button
+                class="primary"
+                onclick="loadFindings()">
+                Search
+            </button>
+
+        </div>
+
+        <div class="tablewrap">
+
+            <table class="table">
+
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Value</th>
+                        <th>Source</th>
+                        <th>Confidence</th>
+                        <th>Source URL</th>
+                        <th>Investigation</th>
+                    </tr>
+                </thead>
+
+                <tbody id="findingsTable">
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<section id="alerts" class="hidden">
+
+    <div class="eyebrow">
+        Monitoring
+    </div>
+
+    <div class="title">
+        Alerts
+    </div>
+
+    <div class="panel">
+
+        <div class="toolbar">
+
+            <span class="muted">
+                Monitoring alerts
+            </span>
+
+            <button
+                class="secondary"
+                onclick="loadAlerts()">
+                Refresh
+            </button>
+
+        </div>
+
+        <div class="tablewrap">
+
+            <table class="table">
+
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Message</th>
+                        <th>Confidence</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody id="alertTable">
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<section id="watch" class="hidden">
+
+    <div class="eyebrow">
+        Continuous Monitoring
+    </div>
+
+    <div class="title">
+        Watchlist
+    </div>
+
+    <div class="panel">
+
+        <div class="toolbar">
+
+            <span class="muted">
+                Tracked actors
+            </span>
+
+            <button
+                class="secondary"
+                onclick="loadWatchlist()">
+                Refresh
+            </button>
+
+        </div>
+
+        <div class="tablewrap">
+
+            <table class="table">
+
+                <thead>
+                    <tr>
+                        <th>Watch ID</th>
+                        <th>Actor</th>
+                        <th>Interval</th>
+                        <th>Enabled</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+
+                <tbody id="watchTable">
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+</main>
+</div>
+
 <script>
-const $=x=>document.getElementById(x);
-function show(id,btn){document.querySelectorAll('main>section').forEach(x=>x.classList.add('hidden'));$(id).classList.remove('hidden');document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));if(btn)btn.classList.add('active');refresh();}
-async function get(u){return (await fetch(u)).json()}
-async function refresh(){let [i,a,w]=await Promise.all([get('/api/investigations'),get('/api/alerts'),get('/api/watchlist')]);$('mInv').textContent=i.length;$('mAlert').textContent=a.filter(x=>!x.is_read).length;$('mWatch').textContent=w.length;$('mFind').textContent=i.reduce((n,x)=>n,0);$('recentAlerts').innerHTML=a.slice(0,7).map(x=>`<div class="item"><b>${x.alert_type}</b><br><span class="muted">${x.message}</span></div>`).join('')||'<span class="muted">No alerts.</span>';$('hist').innerHTML=i.map(x=>`<tr><td>${x.investigation_id.slice(0,12)}…</td><td>${x.target}</td><td>${x.target_type}</td><td><span class="badge">${x.status}</span></td><td>${x.created_at}</td></tr>`).join('');$('alertTable').innerHTML=a.map(x=>`<tr><td>${x.alert_type}</td><td>${x.message}</td><td>${Number(x.confidence).toFixed(2)}</td><td>${x.created_at}</td></tr>`).join('');$('watchTable').innerHTML=w.map(x=>`<tr><td>${x.watch_id}</td><td>${x.actor_id}</td><td>${x.interval_minutes}m</td><td>${x.enabled?'yes':'no'}</td></tr>`).join('');}
-function terminal(s){$('terminal').innerHTML='';s.split('\\n').forEach(x=>{$('terminal').innerHTML+=`<div class="line">${x}</div>`})}
-async function follow(jid){let ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws/jobs/'+jid);ws.onmessage=e=>{let x=JSON.parse(e.data);$('terminal').innerHTML+=`<div class="line">${x.created_at||''} <span class="${x.event_type==='error'?'bad':x.event_type==='completed'?'ok':''}">${x.message||x.status||x.event_type}</span></div>`;$('terminal').scrollTop=1e9};}
-async function startCrawl(){let u=$('url').value.trim();if(!u)return alert('Enter a URL');let r=await fetch('/api/crawl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({urls:[u],target:$('target').value.trim()||null})});let j=await r.json();terminal('Job '+j.job_id+' started\\n');follow(j.job_id);}
-async function startManual(){let t=$('manual').value.trim();if(!t)return;let r=await fetch('/api/investigate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:t,target_type:$('type').value})});let j=await r.json();terminal('OSINT job '+j.job_id+' started\\n');follow(j.job_id);}
-refresh();
-</script></body></html>
+const $ = (id) => document.getElementById(id);
+
+async function api(url, options = {}) {
+    const response = await fetch(url, {
+        headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {})
+        },
+        ...options
+    });
+
+    if (!response.ok) {
+        let message = `HTTP ${response.status}`;
+        try {
+            const data = await response.json();
+            message = data.detail || data.error || message;
+        } catch (_) {}
+        throw new Error(message);
+    }
+
+    return response.json();
+}
+
+/* =========================
+   PAGE NAVIGATION
+========================= */
+
+function showPage(pageId) {
+    document.querySelectorAll(".page").forEach(page => {
+        page.classList.remove("active");
+    });
+
+    const page = $(pageId);
+    if (page) page.classList.add("active");
+
+    document.querySelectorAll(".nav-item").forEach(item => {
+        item.classList.remove("active");
+        if (item.dataset.page === pageId) {
+            item.classList.add("active");
+        }
+    });
+
+    if (pageId === "overview") refreshOverview();
+    if (pageId === "investigations") loadInvestigations();
+    if (pageId === "findings") loadFindings();
+    if (pageId === "alerts") loadAlerts();
+    if (pageId === "watchlist") loadWatchlist();
+}
+
+
+/* =========================
+   TERMINAL
+========================= */
+
+function clearTerminal() {
+    const terminal = $("terminalOutput");
+    if (terminal) terminal.innerHTML = "";
+}
+
+function terminalLog(message, type = "info") {
+    const terminal = $("terminalOutput");
+    if (!terminal) return;
+
+    const line = document.createElement("div");
+    line.className = `terminal-line ${type}`;
+
+    const time = new Date().toLocaleTimeString();
+
+    line.innerHTML = `
+        <span class="terminal-time">[${time}]</span>
+        <span>${escapeHtml(String(message))}</span>
+    `;
+
+    terminal.appendChild(line);
+    terminal.scrollTop = terminal.scrollHeight;
+}
+
+function terminalSuccess(message) {
+    terminalLog(message, "success");
+}
+
+function terminalError(message) {
+    terminalLog(message, "error");
+}
+
+function terminalWarning(message) {
+    terminalLog(message, "warning");
+}
+
+
+/* =========================
+   HTML ESCAPE
+========================= */
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+
+/* =========================
+   JOB MONITOR
+========================= */
+
+async function followJob(jobId) {
+    terminalLog(`Job started: ${jobId}`);
+
+    let websocketWorked = false;
+
+    try {
+        const protocol = location.protocol === "https:" ? "wss" : "ws";
+        const ws = new WebSocket(
+            `${protocol}://${location.host}/ws/jobs/${jobId}`
+        );
+
+        ws.onopen = () => {
+            websocketWorked = true;
+            terminalSuccess("Live job connection established.");
+        };
+
+        ws.onmessage = event => {
+            try {
+                const data = JSON.parse(event.data);
+
+                const eventMessage =
+                    data.message ||
+                    data.event ||
+                    data.status ||
+                    JSON.stringify(data);
+
+                terminalLog(eventMessage);
+
+                if (
+                    data.status === "completed" ||
+                    data.status === "success" ||
+                    data.type === "completed"
+                ) {
+                    terminalSuccess("Job completed.");
+                    ws.close();
+                    loadCurrentInvestigation();
+                }
+
+                if (
+                    data.status === "failed" ||
+                    data.status === "error" ||
+                    data.type === "failed"
+                ) {
+                    terminalError(eventMessage);
+                    ws.close();
+                }
+            } catch (_) {
+                terminalLog(event.data);
+            }
+        };
+
+        ws.onerror = () => {
+            if (!websocketWorked) {
+                terminalWarning("WebSocket unavailable. Switching to polling.");
+            }
+        };
+
+        ws.onclose = () => {
+            if (!websocketWorked) {
+                pollJob(jobId);
+            }
+        };
+
+        setTimeout(() => {
+            if (!websocketWorked && ws.readyState !== WebSocket.OPEN) {
+                try {
+                    ws.close();
+                } catch (_) {}
+
+                pollJob(jobId);
+            }
+        }, 2500);
+
+    } catch (_) {
+        pollJob(jobId);
+    }
+}
+
+
+async function pollJob(jobId) {
+    terminalLog("Polling job status...");
+
+    let finished = false;
+
+    while (!finished) {
+        try {
+            const data = await api(`/api/jobs/${jobId}`);
+
+            const job = data.job || data;
+            const events = data.events || [];
+
+            if (events.length) {
+                const latest = events[events.length - 1];
+
+                const message =
+                    latest.message ||
+                    latest.event ||
+                    latest.status ||
+                    JSON.stringify(latest);
+
+                terminalLog(message);
+            }
+
+            const status = job.status || "";
+
+            if (
+                status === "completed" ||
+                status === "success" ||
+                status === "done"
+            ) {
+                terminalSuccess("Job completed.");
+                finished = true;
+                await loadCurrentInvestigation();
+                break;
+            }
+
+            if (
+                status === "failed" ||
+                status === "error"
+            ) {
+                terminalError(
+                    job.error ||
+                    job.message ||
+                    "Job failed."
+                );
+                finished = true;
+                break;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+        } catch (error) {
+            terminalError(error.message);
+            finished = true;
+        }
+    }
+}
+
+
+/* =========================
+   CRAWLER
+========================= */
+
+async function startCrawl() {
+    clearTerminal();
+
+    const urlInput = $("crawlUrl");
+    const targetInput = $("crawlTarget");
+
+    const url = urlInput ? urlInput.value.trim() : "";
+    const target = targetInput ? targetInput.value.trim() : "";
+
+    if (!url) {
+        terminalError("Enter a URL to crawl.");
+        return;
+    }
+
+    terminalLog("Preparing crawler...");
+    terminalLog(`Target URL: ${url}`);
+
+    if (target) {
+        terminalLog(`Target actor/username: ${target}`);
+    }
+
+    try {
+        const payload = {
+            urls: [url],
+            target: target || null
+        };
+
+        terminalLog("Sending crawl request...");
+
+        const data = await api("/api/crawl", {
+            method: "POST",
+            body: JSON.stringify(payload)
+        });
+
+        terminalSuccess("Crawler request accepted.");
+
+        if (data.investigation_id) {
+            terminalLog(
+                `Investigation ID: ${data.investigation_id}`
+            );
+        }
+
+        if (data.job_id) {
+            terminalLog(`Job ID: ${data.job_id}`);
+            await followJob(data.job_id);
+        } else if (data.id) {
+            terminalLog(`Job ID: ${data.id}`);
+            await followJob(data.id);
+        } else {
+            terminalWarning(
+                "Crawler returned no job ID."
+            );
+        }
+
+        await loadCurrentInvestigation();
+        await refreshOverview();
+
+    } catch (error) {
+        terminalError(`Crawler error: ${error.message}`);
+    }
+}
+
+
+/* =========================
+   MANUAL OSINT
+========================= */
+
+async function startManual() {
+    clearTerminal();
+
+    const targetInput = $("manualTarget");
+    const typeInput = $("manualType");
+
+    const target = targetInput ? targetInput.value.trim() : "";
+    const targetType = typeInput ? typeInput.value : "other";
+
+    if (!target) {
+        terminalError("Enter a target.");
+        return;
+    }
+
+    terminalLog("Preparing OSINT investigation...");
+    terminalLog(`Target: ${target}`);
+    terminalLog(`Type: ${targetType}`);
+
+    try {
+        const payload = {
+            target: target,
+            target_type: targetType
+        };
+
+        terminalLog("Sending OSINT request...");
+
+        const data = await api("/api/investigate", {
+            method: "POST",
+            body: JSON.stringify(payload)
+        });
+
+        terminalSuccess("OSINT request accepted.");
+
+        if (data.investigation_id) {
+            terminalLog(
+                `Investigation ID: ${data.investigation_id}`
+            );
+        }
+
+        if (data.job_id) {
+            terminalLog(`Job ID: ${data.job_id}`);
+            await followJob(data.job_id);
+        } else if (data.id) {
+            terminalLog(`Job ID: ${data.id}`);
+            await followJob(data.id);
+        } else {
+            terminalWarning(
+                "OSINT engine returned no job ID."
+            );
+        }
+
+        await loadCurrentInvestigation();
+        await refreshOverview();
+
+    } catch (error) {
+        terminalError(`OSINT error: ${error.message}`);
+    }
+}
+
+
+  /* =========================
+   CURRENT INVESTIGATION
+========================= */
+
+async function loadCurrentInvestigation() {
+    try {
+        const iid =
+            localStorage.getItem("current_investigation_id");
+
+        if (!iid) return;
+
+        const data = await api(
+            `/api/investigations/${encodeURIComponent(iid)}`
+        );
+
+        renderCurrentInvestigation(data);
+
+    } catch (error) {
+        terminalWarning(
+            `Could not load investigation: ${error.message}`
+        );
+    }
+}
+
+
+function renderCurrentInvestigation(data) {
+    const findings =
+        data.findings ||
+        data.result?.findings ||
+        [];
+
+    const tableBody = $("currentFindingsBody");
+
+    if (!tableBody) return;
+
+    if (!findings.length) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="7" class="empty-state">
+                    No findings yet.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tableBody.innerHTML = findings
+        .map(renderFindingRow)
+        .join("");
+}
+
+
+function renderFindingRow(finding) {
+    const type =
+        finding.finding_type ||
+        finding.type ||
+        "other";
+
+    const value =
+        finding.value ||
+        "-";
+
+    const source =
+        finding.source ||
+        "unknown";
+
+    const confidence =
+        finding.confidence !== undefined &&
+        finding.confidence !== null
+            ? Number(finding.confidence).toFixed(2)
+            : "-";
+
+    const sourceUrl =
+        finding.source_url ||
+        "";
+
+    const firstSeen =
+        finding.first_seen ||
+        finding.collected_at ||
+        "-";
+
+    return `
+        <tr>
+            <td>${escapeHtml(type)}</td>
+
+            <td class="finding-value">
+                ${escapeHtml(value)}
+            </td>
+
+            <td>
+                ${escapeHtml(source)}
+            </td>
+
+            <td>
+                ${escapeHtml(confidence)}
+            </td>
+
+            <td>
+                ${
+                    sourceUrl
+                    ? `<a href="${escapeHtml(sourceUrl)}"
+                         target="_blank"
+                         rel="noopener noreferrer">
+                         Source
+                       </a>`
+                    : "-"
+                }
+            </td>
+
+            <td>
+                ${escapeHtml(firstSeen)}
+            </td>
+
+            <td>
+                <button
+                    class="small-btn"
+                    onclick='viewFinding(${JSON.stringify(finding)})'>
+                    View
+                </button>
+            </td>
+        </tr>
+    `;
+}
+
+
+function viewFinding(finding) {
+    const metadata =
+        finding.metadata || {};
+
+    const evidence =
+        finding.evidence || [];
+
+    const text = `
+Finding type: ${finding.finding_type || finding.type || "-"}
+Value: ${finding.value || "-"}
+Source: ${finding.source || "-"}
+Source URL: ${finding.source_url || "-"}
+Confidence: ${finding.confidence ?? "-"}
+First seen: ${finding.first_seen || "-"}
+Last seen: ${finding.last_seen || "-"}
+Evidence count: ${evidence.length}
+
+Metadata:
+${JSON.stringify(metadata, null, 2)}
+    `.trim();
+
+    alert(text);
+}
+
+
+/* =========================
+   OVERVIEW
+========================= */
+
+async function refreshOverview() {
+    try {
+        const investigations =
+            await api("/api/investigations");
+
+        const findings =
+            await api("/api/findings");
+
+        const alerts =
+            await api("/api/alerts");
+
+        const watchlist =
+            await api("/api/watchlist");
+
+        const investigationList =
+            Array.isArray(investigations)
+                ? investigations
+                : investigations.items || [];
+
+        const findingList =
+            Array.isArray(findings)
+                ? findings
+                : findings.items || [];
+
+        const alertList =
+            Array.isArray(alerts)
+                ? alerts
+                : alerts.items || [];
+
+        const watchlistItems =
+            Array.isArray(watchlist)
+                ? watchlist
+                : watchlist.items || [];
+
+        if ($("statInvestigations")) {
+            $("statInvestigations").textContent =
+                investigationList.length;
+        }
+
+        if ($("statFindings")) {
+            $("statFindings").textContent =
+                findingList.length;
+        }
+
+        if ($("statActors")) {
+            $("statActors").textContent =
+                watchlistItems.length;
+        }
+
+        if ($("statAlerts")) {
+            $("statAlerts").textContent =
+                alertList.filter(
+                    alert => !alert.read
+                ).length;
+        }
+
+        renderRecentAlerts(alertList);
+
+    } catch (error) {
+        console.error(
+            "Overview refresh failed:",
+            error
+        );
+    }
+}
+
+
+function renderRecentAlerts(alerts) {
+    const container =
+        $("recentAlerts");
+
+    if (!container) return;
+
+    if (!alerts.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                No alerts.
+            </div>
+        `;
+        return;
+    }
+
+    const recent =
+        [...alerts]
+            .sort(
+                (a, b) =>
+                    new Date(
+                        b.created_at ||
+                        b.timestamp ||
+                        0
+                    ) -
+                    new Date(
+                        a.created_at ||
+                        a.timestamp ||
+                        0
+                    )
+            )
+            .slice(0, 5);
+
+    container.innerHTML = recent
+        .map(alert => `
+            <div class="alert-item">
+                <div>
+                    <strong>
+                        ${escapeHtml(
+                            alert.title ||
+                            alert.message ||
+                            "Alert"
+                        )}
+                    </strong>
+
+                    <div class="muted">
+                        ${escapeHtml(
+                            alert.created_at ||
+                            alert.timestamp ||
+                            ""
+                        )}
+                    </div>
+                </div>
+            </div>
+        `)
+        .join("");
+}
+
+
+/* =========================
+   INVESTIGATIONS
+========================= */
+
+async function loadInvestigations() {
+    const tbody =
+        $("investigationsBody");
+
+    if (!tbody) return;
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="6">
+                Loading investigations...
+            </td>
+        </tr>
+    `;
+
+    try {
+        const data =
+            await api("/api/investigations");
+
+        const items =
+            Array.isArray(data)
+                ? data
+                : data.items || [];
+
+        if (!items.length) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6"
+                        class="empty-state">
+                        No investigations found.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = items
+            .map(item => {
+                const iid =
+                    item.investigation_id ||
+                    item.id ||
+                    "";
+
+                return `
+                    <tr>
+                        <td>
+                            ${escapeHtml(iid)}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                item.actor_id ||
+                                item.target ||
+                                "-"
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                item.status ||
+                                "-"
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                String(
+                                    item.findings_count ??
+                                    item.finding_count ??
+                                    0
+                                )
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                item.created_at ||
+                                "-"
+                            )}
+                        </td>
+
+                        <td>
+                            <button
+                                class="small-btn"
+                                onclick="viewInvestigation('${escapeHtml(iid)}')">
+                                Open
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            })
+            .join("");
+
+    } catch (error) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6"
+                    class="error">
+                    ${escapeHtml(error.message)}
+                </td>
+            </tr>
+        `;
+    }
+}
+
+
+async function viewInvestigation(iid) {
+    try {
+        localStorage.setItem(
+            "current_investigation_id",
+            iid
+        );
+
+        const data =
+            await api(
+                `/api/investigations/${encodeURIComponent(iid)}`
+            );
+
+        renderCurrentInvestigation(data);
+
+        const detail =
+            $("historyDetail");
+
+        if (detail) {
+            detail.classList.remove("hidden");
+
+            const title =
+                $("historyDetailTitle");
+
+            if (title) {
+                title.textContent =
+                    `Investigation ${iid}`;
+            }
+
+            const content =
+                $("historyDetailContent");
+
+            if (content) {
+                content.textContent =
+                    JSON.stringify(
+                        data,
+                        null,
+                        2
+                    );
+            }
+        }
+
+        showPage("overview");
+
+    } catch (error) {
+        alert(
+            `Failed to open investigation: ${error.message}`
+        );
+    }
+}
+
+
+function closeHistoryDetail() {
+    const detail =
+        $("historyDetail");
+
+    if (detail) {
+        detail.classList.add("hidden");
+    }
+}
+
+
+/* =========================
+   FINDINGS
+========================= */
+
+async function loadFindings() {
+    const tbody =
+        $("findingsBody");
+
+    if (!tbody) return;
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="7">
+                Loading findings...
+            </td>
+        </tr>
+    `;
+
+    try {
+        const search =
+            $("findingSearch")?.value.trim() || "";
+
+        const type =
+            $("findingType")?.value || "";
+
+        const params =
+            new URLSearchParams();
+
+        if (search) {
+            params.set("q", search);
+        }
+
+        if (type) {
+            params.set(
+                "finding_type",
+                type
+            );
+        }
+
+        const query =
+            params.toString()
+                ? `?${params.toString()}`
+                : "";
+
+        const data =
+            await api(
+                `/api/findings${query}`
+            );
+
+        const items =
+            Array.isArray(data)
+                ? data
+                : data.items || [];
+
+        if (!items.length) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7"
+                        class="empty-state">
+                        No findings found.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML =
+            items.map(renderFindingRow)
+                .join("");
+
+    } catch (error) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7"
+                    class="error">
+                    ${escapeHtml(error.message)}
+                </td>
+            </tr>
+        `;
+    }
+}
+
+
+/* =========================
+   ALERTS
+========================= */
+
+async function loadAlerts() {
+    const container =
+        $("alertsList");
+
+    if (!container) return;
+
+    container.innerHTML =
+        `<div class="muted">Loading alerts...</div>`;
+
+    try {
+        const data =
+            await api("/api/alerts");
+
+        const alerts =
+            Array.isArray(data)
+                ? data
+                : data.items || [];
+
+        if (!alerts.length) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    No alerts.
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML =
+            alerts.map(alert => `
+                <div class="alert-card
+                    ${alert.read ? "read" : "unread"}">
+
+                    <div class="alert-main">
+                        <strong>
+                            ${escapeHtml(
+                                alert.title ||
+                                "Alert"
+                            )}
+                        </strong>
+
+                        <p>
+                            ${escapeHtml(
+                                alert.message ||
+                                alert.description ||
+                                ""
+                            )}
+                        </p>
+
+                        <small>
+                            ${escapeHtml(
+                                alert.created_at ||
+                                alert.timestamp ||
+                                ""
+                            )}
+                        </small>
+                    </div>
+
+                    ${
+                        alert.read
+                        ? ""
+                        : `
+                            <button
+                                class="small-btn"
+                                onclick="markAlertRead('${escapeHtml(
+                                    alert.id ||
+                                    alert.alert_id ||
+                                    ""
+                                )}')">
+                                Mark read
+                            </button>
+                        `
+                    }
+                </div>
+            `).join("");
+
+    } catch (error) {
+        container.innerHTML = `
+            <div class="error">
+                ${escapeHtml(error.message)}
+            </div>
+        `;
+    }
+}
+
+
+async function markAlertRead(alertId) {
+    if (!alertId) return;
+
+    try {
+        await api(
+            `/api/alerts/${encodeURIComponent(alertId)}/read`,
+            {
+                method: "POST"
+            }
+        );
+
+        await loadAlerts();
+        await refreshOverview();
+
+    } catch (error) {
+        alert(
+            `Could not update alert: ${error.message}`
+        );
+    }
+}
+
+
+/* =========================
+   WATCHLIST
+========================= */
+
+async function loadWatchlist() {
+    const tbody =
+        $("watchlistBody");
+
+    if (!tbody) return;
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="6">
+                Loading watchlist...
+            </td>
+        </tr>
+    `;
+
+    try {
+        const data =
+            await api("/api/watchlist");
+
+        const items =
+            Array.isArray(data)
+                ? data
+                : data.items || [];
+
+        if (!items.length) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6"
+                        class="empty-state">
+                        No tracked actors.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML =
+            items.map(item => `
+                <tr>
+                    <td>
+                        ${escapeHtml(
+                            item.actor_id ||
+                            item.id ||
+                            "-"
+                        )}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(
+                            item.name ||
+                            item.username ||
+                            item.value ||
+                            "-"
+                        )}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(
+                            item.platform ||
+                            item.source ||
+                            "-"
+                        )}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(
+                            item.status ||
+                            "active"
+                        )}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(
+                            item.last_scanned ||
+                            item.updated_at ||
+                            "-"
+                        )}
+                    </td>
+
+                    <td>
+                        <button
+                            class="small-btn danger"
+                            onclick="removeWatch('${escapeHtml(
+                                item.id ||
+                                item.watchlist_id ||
+                                item.actor_id ||
+                                ""
+                            )}')">
+                            Remove
+                        </button>
+                    </td>
+                </tr>
+            `).join("");
+
+    } catch (error) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6"
+                    class="error">
+                    ${escapeHtml(error.message)}
+                </td>
+            </tr>
+        `;
+    }
+}
+
+
+async function removeWatch(id) {
+    if (!id) return;
+
+    if (!confirm(
+        "Remove this actor from the watchlist?"
+    )) {
+        return;
+    }
+
+    try {
+        await api(
+            `/api/watchlist/${encodeURIComponent(id)}`,
+            {
+                method: "DELETE"
+            }
+        );
+
+        await loadWatchlist();
+        await refreshOverview();
+
+    } catch (error) {
+        alert(
+            `Could not remove actor: ${error.message}`
+        );
+    }
+}
+
+
+/* =========================
+   INITIAL LOAD
+========================= */
+
+async function loadAll() {
+    await refreshOverview();
+    await loadCurrentInvestigation();
+}
+
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+        loadAll();
+
+        setInterval(
+            refreshOverview,
+            10000
+        );
+    }
+);
+
+
+/* =========================
+   NAVIGATION CLICK HANDLER
+========================= */
+
+document.addEventListener(
+    "click",
+    event => {
+        const item =
+            event.target.closest(
+                ".nav-item"
+            );
+
+        if (!item) return;
+
+        const page =
+            item.dataset.page;
+
+        if (page) {
+            event.preventDefault();
+            showPage(page);
+        }
+    }
+);
+</script>
+
+</body>
+</html>
+  
