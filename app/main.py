@@ -13,6 +13,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.responses import (
+    FileResponse,
     HTMLResponse,
     Response,
 )
@@ -24,6 +25,7 @@ from .analysis import (
     stylometry,
 )
 from .config import (
+    CRAWLER_PATH,
     DB_PATH,
     SCHEMA_PATH,
 )
@@ -33,6 +35,7 @@ from .crawler_runner import (
 from .database import DB
 from .engine_runner import (
     run_osint,
+    run_osint_from_crawl,
 )
 from .reports import (
     actor,
@@ -148,6 +151,7 @@ def health():
         "status": "ok",
         "database": DB_PATH,
         "schema": SCHEMA_PATH,
+        "crawler_path": CRAWLER_PATH,
     }
 
 
@@ -243,6 +247,149 @@ def investigate(
 
 
 # ============================================================
+# SEND CRAWLER FINDINGS TO OSINT ENGINE
+# ============================================================
+
+@app.post(
+    "/api/investigations/{investigation_id}/send-to-osint"
+)
+def send_to_osint(
+    investigation_id: str,
+):
+    investigation_data = db.investigation(
+        investigation_id
+    )
+
+    if not investigation_data:
+        raise HTTPException(
+            404,
+            "investigation not found",
+        )
+
+    findings = investigation_data.get(
+        "findings",
+        [],
+    )
+
+    if not findings:
+        raise HTTPException(
+            400,
+            "No crawler findings are available "
+            "for this investigation.",
+        )
+
+    # --------------------------------------------------------
+    # Build a clean list of identifiers from crawler findings.
+    # --------------------------------------------------------
+
+    identifiers = []
+
+    supported_types = {
+        "username",
+        "email",
+        "url",
+        "domain",
+        "dns",
+        "ip",
+        "pgp",
+        "crypto",
+    }
+
+    seen = set()
+
+    for finding in findings:
+
+        finding_type = (
+            finding.get("finding_type")
+            or finding.get("type")
+            or "other"
+        )
+
+        value = finding.get("value")
+
+        if not value:
+            continue
+
+        if finding_type not in supported_types:
+            continue
+
+        key = (
+            finding_type,
+            str(value).strip().lower(),
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        identifiers.append(
+            {
+                "type": finding_type,
+                "value": str(value),
+                "source": (
+                    finding.get("source")
+                    or "dark-crawler"
+                ),
+                "source_url": finding.get(
+                    "source_url"
+                ),
+                "confidence": finding.get(
+                    "confidence",
+                    0.5,
+                ),
+            }
+        )
+
+    if not identifiers:
+        raise HTTPException(
+            400,
+            "No supported OSINT identifiers were "
+            "found in the crawler report.",
+        )
+
+    actor_id = investigation_data.get(
+        "actor_id"
+    )
+
+    job_id = db.create_job(
+        "osint_from_crawler",
+        investigation_id,
+        {
+            "investigation_id":
+                investigation_id,
+            "actor_id":
+                actor_id,
+            "identifier_count":
+                len(identifiers),
+        },
+    )
+
+    thread = threading.Thread(
+        target=run_osint_from_crawl,
+        kwargs={
+            "db": db,
+            "job_id": job_id,
+            "iid": investigation_id,
+            "actor_id": actor_id,
+            "identifiers": identifiers,
+        },
+        daemon=True,
+    )
+
+    thread.start()
+
+    return {
+        "job_id": job_id,
+        "investigation_id":
+            investigation_id,
+        "actor_id": actor_id,
+        "identifier_count":
+            len(identifiers),
+    }
+
+
+# ============================================================
 # JOB
 # ============================================================
 
@@ -319,8 +466,12 @@ async def websocket_job(
             ):
                 await websocket.send_json(
                     {
-                        "event_type": "terminal",
-                        "status": job["status"],
+                        "event_type":
+                            "terminal",
+                        "message":
+                            f"Job {job['status']}",
+                        "status":
+                            job["status"],
                     }
                 )
 
@@ -403,6 +554,129 @@ def actor_report(
 
 
 # ============================================================
+# NATIVE CRAWLER REPORT FILES
+# ============================================================
+
+CRAWLER_REPORTS = {
+    "actor_report.json",
+    "network_report.json",
+    "actor.json",
+    "network.json",
+    "actor.csv",
+    "network.csv",
+    "actor.jsonl",
+    "network.jsonl",
+}
+
+
+def _crawler_report_path(
+    investigation_id: str,
+    report_name: str,
+):
+    """
+    Resolve the native crawler report belonging to the
+    crawler session associated with this platform investigation.
+    """
+
+    if report_name not in CRAWLER_REPORTS:
+        raise HTTPException(
+            400,
+            "Unsupported crawler report.",
+        )
+
+    investigation_data = db.investigation(
+        investigation_id
+    )
+
+    if not investigation_data:
+        raise HTTPException(
+            404,
+            "investigation not found",
+        )
+
+    crawler_session_id = (
+        investigation_data.get(
+            "crawler_session_id"
+        )
+    )
+
+    if not crawler_session_id:
+        raise HTTPException(
+            404,
+            "Crawler report is not available yet.",
+        )
+
+    crawler_root = Path(
+        CRAWLER_PATH
+    ).resolve()
+
+    report_root = (
+        crawler_root
+        / "output"
+        / f"session_{crawler_session_id}"
+    ).resolve()
+
+    report_path = (
+        report_root
+        / report_name
+    ).resolve()
+
+    # --------------------------------------------------------
+    # Prevent path traversal.
+    # --------------------------------------------------------
+
+    try:
+        report_path.relative_to(
+            report_root
+        )
+    except ValueError:
+        raise HTTPException(
+            400,
+            "Invalid report path.",
+        )
+
+    if not report_path.exists():
+        raise HTTPException(
+            404,
+            f"Crawler report not found: "
+            f"{report_name}",
+        )
+
+    if not report_path.is_file():
+        raise HTTPException(
+            404,
+            "Crawler report is not a file.",
+        )
+
+    return report_path
+
+
+@app.get(
+    "/api/reports/{investigation_id}/crawler/{report_name}"
+)
+def crawler_report(
+    investigation_id: str,
+    report_name: str,
+):
+    path = _crawler_report_path(
+        investigation_id,
+        report_name,
+    )
+
+    media_type = (
+        "text/csv"
+        if path.suffix == ".csv"
+        else "application/json"
+    )
+
+    return FileResponse(
+        path,
+        media_type=media_type,
+        filename=path.name,
+    )
+
+
+# ============================================================
 # FINDINGS
 # ============================================================
 
@@ -454,7 +728,8 @@ def export_json(
         media_type="application/json",
         headers={
             "Content-Disposition":
-                f'attachment; filename="{investigation_id}.json"'
+                f'attachment; '
+                f'filename="{investigation_id}.json"'
         },
     )
 
@@ -482,7 +757,8 @@ def export_csv(
         media_type="text/csv",
         headers={
             "Content-Disposition":
-                f'attachment; filename="{investigation_id}.csv"'
+                f'attachment; '
+                f'filename="{investigation_id}.csv"'
         },
     )
 
@@ -511,7 +787,8 @@ def export_html(
         media_type="text/html",
         headers={
             "Content-Disposition":
-                f'attachment; filename="{investigation_id}.html"'
+                f'attachment; '
+                f'filename="{investigation_id}.html"'
         },
     )
 
@@ -604,8 +881,6 @@ scheduler = None
 def startup():
     global scheduler
 
-    # Keep scheduler initialization isolated.
-    # The current tracking implementation is process-local.
     try:
         scheduler = Scheduler(
             db,
