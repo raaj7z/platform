@@ -956,7 +956,7 @@ a{color:var(--accent)}
 
         <div class="tablewrap">
 
-            <table class="table">
+            <table class="table">se 
 
                 <thead>
                     <tr>
@@ -981,9 +981,19 @@ a{color:var(--accent)}
 
 </main>
 </div>
+    <script>  
+    const $ = (id) => document.getElementById(id);
 
-<script>
-const $ = (id) => document.getElementById(id);
+let currentJobId = null;
+let currentInvestigationId = localStorage.getItem("currentInvestigationId") || null;
+let currentActorId = localStorage.getItem("currentActorId") || null;
+let jobSocket = null;
+let pollTimer = null;
+
+
+/* =========================
+   API HELPER
+========================= */
 
 async function api(url, options = {}) {
     const response = await fetch(url, {
@@ -994,42 +1004,72 @@ async function api(url, options = {}) {
         ...options
     });
 
+    let data = null;
+
+    try {
+        data = await response.json();
+    } catch (_) {
+        data = null;
+    }
+
     if (!response.ok) {
-        let message = `HTTP ${response.status}`;
-        try {
-            const data = await response.json();
-            message = data.detail || data.error || message;
-        } catch (_) {}
+        const message =
+            data?.detail ||
+            data?.error ||
+            `Request failed (${response.status})`;
+
         throw new Error(message);
     }
 
-    return response.json();
+    return data;
 }
+
 
 /* =========================
    PAGE NAVIGATION
 ========================= */
 
-function showPage(pageId) {
-    document.querySelectorAll(".page").forEach(page => {
-        page.classList.remove("active");
+function showPage(pageId, button) {
+    // Actual HTML uses section.hidden, not .page/.active
+    document.querySelectorAll("main > section").forEach(section => {
+        section.classList.add("hidden");
     });
 
     const page = $(pageId);
-    if (page) page.classList.add("active");
 
-    document.querySelectorAll(".nav-item").forEach(item => {
-        item.classList.remove("active");
-        if (item.dataset.page === pageId) {
-            item.classList.add("active");
-        }
+    if (page) {
+        page.classList.remove("hidden");
+    }
+
+    // Actual navigation uses normal buttons
+    document.querySelectorAll("nav button").forEach(btn => {
+        btn.classList.remove("active");
     });
 
-    if (pageId === "overview") refreshOverview();
-    if (pageId === "investigations") loadInvestigations();
-    if (pageId === "findings") loadFindings();
-    if (pageId === "alerts") loadAlerts();
-    if (pageId === "watchlist") loadWatchlist();
+    if (button) {
+        button.classList.add("active");
+    }
+
+    // Load page-specific data
+    if (pageId === "overview") {
+        loadStats();
+    }
+
+    if (pageId === "history") {
+        loadInvestigations();
+    }
+
+    if (pageId === "findings") {
+        loadFindings();
+    }
+
+    if (pageId === "alerts") {
+        loadAlerts();
+    }
+
+    if (pageId === "watch") {
+        loadWatchlist();
+    }
 }
 
 
@@ -1037,354 +1077,470 @@ function showPage(pageId) {
    TERMINAL
 ========================= */
 
-function clearTerminal() {
-    const terminal = $("terminalOutput");
-    if (terminal) terminal.innerHTML = "";
-}
-
 function terminalLog(message, type = "info") {
-    const terminal = $("terminalOutput");
-    if (!terminal) return;
+    const terminal = $("terminal");
 
-    const line = document.createElement("div");
-    line.className = `terminal-line ${type}`;
+    if (!terminal) {
+        return;
+    }
 
     const time = new Date().toLocaleTimeString();
 
-    line.innerHTML = `
-        <span class="terminal-time">[${time}]</span>
-        <span>${escapeHtml(String(message))}</span>
-    `;
+    const line = document.createElement("div");
+
+    line.className = `terminal-line ${type}`;
+
+    line.textContent = `[${time}] ${message}`;
 
     terminal.appendChild(line);
+
     terminal.scrollTop = terminal.scrollHeight;
 }
 
-function terminalSuccess(message) {
-    terminalLog(message, "success");
-}
 
-function terminalError(message) {
-    terminalLog(message, "error");
-}
+function overviewLog(message, type = "info") {
+    const terminal = $("overviewTerminal");
 
-function terminalWarning(message) {
-    terminalLog(message, "warning");
-}
+    if (!terminal) {
+        return;
+    }
 
+    const time = new Date().toLocaleTimeString();
 
-/* =========================
-   HTML ESCAPE
-========================= */
+    const line = document.createElement("div");
 
-function escapeHtml(value) {
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+    line.className = `terminal-line ${type}`;
+
+    line.textContent = `[${time}] ${message}`;
+
+    terminal.appendChild(line);
+
+    terminal.scrollTop = terminal.scrollHeight;
 }
 
 
 /* =========================
-   JOB MONITOR
+   CURRENT INVESTIGATION
 ========================= */
 
-async function followJob(jobId) {
-    terminalLog(`Job started: ${jobId}`);
+function setCurrentInvestigation(investigationId, actorId = null) {
+    currentInvestigationId = investigationId;
+    currentActorId = actorId;
 
-    let websocketWorked = false;
+    if (investigationId) {
+        localStorage.setItem(
+            "currentInvestigationId",
+            investigationId
+        );
+    }
+
+    if (actorId) {
+        localStorage.setItem(
+            "currentActorId",
+            actorId
+        );
+    }
+
+    loadCurrentInvestigation();
+}
+
+
+/* =========================
+   START CRAWL
+========================= */
+
+async function startCrawl() {
+    const urlInput = $("url");
+    const targetInput = $("target");
+
+    const urlText = urlInput?.value.trim() || "";
+    const target = targetInput?.value.trim() || "";
+
+    if (!urlText) {
+        terminalLog("Please enter at least one URL.", "error");
+        return;
+    }
+
+    const urls = urlText
+        .split(/\r?\n/)
+        .map(url => url.trim())
+        .filter(Boolean);
+
+    const button = document.querySelector(
+        'button[onclick="startCrawl()"]'
+    );
+
+    if (button) {
+        button.disabled = true;
+    }
+
+    terminalLog("Starting crawler...", "info");
 
     try {
-        const protocol = location.protocol === "https:" ? "wss" : "ws";
-        const ws = new WebSocket(
-            `${protocol}://${location.host}/ws/jobs/${jobId}`
+        const result = await api("/api/crawl", {
+            method: "POST",
+            body: JSON.stringify({
+                urls: urls,
+                target: target || null,
+                workers: 3
+            })
+        });
+
+        currentJobId = result.job_id;
+
+        setCurrentInvestigation(
+            result.investigation_id,
+            result.actor_id
         );
 
-        ws.onopen = () => {
-            websocketWorked = true;
-            terminalSuccess("Live job connection established.");
+        terminalLog(
+            `Investigation created: ${result.investigation_id}`,
+            "success"
+        );
+
+        terminalLog(
+            `Crawler job started: ${result.job_id}`,
+            "success"
+        );
+
+        updateJobStatus("RUNNING");
+
+        followJob(result.job_id);
+
+    } catch (error) {
+        terminalLog(
+            `Crawler error: ${error.message}`,
+            "error"
+        );
+
+        updateJobStatus("ERROR");
+
+    } finally {
+        if (button) {
+            button.disabled = false;
+        }
+    }
+}
+
+
+/* =========================
+   START MANUAL OSINT
+========================= */
+
+async function startManual() {
+    const targetInput = $("manual");
+    const typeInput = $("type");
+
+    const target = targetInput?.value.trim() || "";
+    const targetType = typeInput?.value || "other";
+
+    if (!target) {
+        terminalLog(
+            "Please enter a target.",
+            "error"
+        );
+        return;
+    }
+
+    const button = document.querySelector(
+        'button[onclick="startManual()"]'
+    );
+
+    if (button) {
+        button.disabled = true;
+    }
+
+    terminalLog(
+        `Starting OSINT investigation for ${target}...`,
+        "info"
+    );
+
+    try {
+        const result = await api("/api/investigate", {
+            method: "POST",
+            body: JSON.stringify({
+                target: target,
+                target_type: targetType,
+                notes: null
+            })
+        });
+
+        currentJobId = result.job_id;
+
+        setCurrentInvestigation(
+            result.investigation_id,
+            result.actor_id
+        );
+
+        terminalLog(
+            `Investigation created: ${result.investigation_id}`,
+            "success"
+        );
+
+        terminalLog(
+            `OSINT job started: ${result.job_id}`,
+            "success"
+        );
+
+        updateJobStatus("RUNNING");
+
+        followJob(result.job_id);
+
+    } catch (error) {
+        terminalLog(
+            `OSINT error: ${error.message}`,
+            "error"
+        );
+
+        updateJobStatus("ERROR");
+
+    } finally {
+        if (button) {
+            button.disabled = false;
+        }
+    }
+}
+
+
+/* =========================
+   JOB STATUS
+========================= */
+
+function updateJobStatus(status) {
+    const element = $("jobStatus");
+
+    if (!element) {
+        return;
+    }
+
+    element.textContent = status;
+
+    element.className = "";
+
+    const normalized = String(status).toLowerCase();
+
+    if (normalized === "completed" || normalized === "success") {
+        element.classList.add("success");
+    } else if (
+        normalized === "failed" ||
+        normalized === "error"
+    ) {
+        element.classList.add("error");
+    } else if (normalized === "running") {
+        element.classList.add("running");
+    }
+}
+
+
+/* =========================
+   JOB MONITORING
+========================= */
+
+function followJob(jobId) {
+    currentJobId = jobId;
+
+    // Close old socket
+    if (jobSocket) {
+        try {
+            jobSocket.close();
+        } catch (_) {}
+        jobSocket = null;
+    }
+
+    // Stop old polling
+    if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+
+    const protocol =
+        window.location.protocol === "https:"
+            ? "wss:"
+            : "ws:";
+
+    const wsUrl =
+        `${protocol}//${window.location.host}/ws/jobs/${jobId}`;
+
+    try {
+        jobSocket = new WebSocket(wsUrl);
+
+        jobSocket.onopen = () => {
+            terminalLog(
+                "Connected to live job monitor.",
+                "success"
+            );
         };
 
-        ws.onmessage = event => {
+        jobSocket.onmessage = event => {
             try {
                 const data = JSON.parse(event.data);
 
-                const eventMessage =
-                    data.message ||
-                    data.event ||
-                    data.status ||
-                    JSON.stringify(data);
-
-                terminalLog(eventMessage);
-
-                if (
-                    data.status === "completed" ||
-                    data.status === "success" ||
-                    data.type === "completed"
-                ) {
-                    terminalSuccess("Job completed.");
-                    ws.close();
-                    loadCurrentInvestigation();
-                }
-
-                if (
-                    data.status === "failed" ||
-                    data.status === "error" ||
-                    data.type === "failed"
-                ) {
-                    terminalError(eventMessage);
-                    ws.close();
-                }
-            } catch (_) {
-                terminalLog(event.data);
+                handleJobEvent(data);
+            } catch (error) {
+                terminalLog(
+                    "Received invalid job event.",
+                    "error"
+                );
             }
         };
 
-        ws.onerror = () => {
-            if (!websocketWorked) {
-                terminalWarning("WebSocket unavailable. Switching to polling.");
-            }
+        jobSocket.onerror = () => {
+            terminalLog(
+                "Live monitor unavailable. Switching to polling.",
+                "error"
+            );
+
+            startJobPolling(jobId);
         };
 
-        ws.onclose = () => {
-            if (!websocketWorked) {
-                pollJob(jobId);
-            }
+        jobSocket.onclose = () => {
+            // Polling will keep status updated if the socket closes.
+            startJobPolling(jobId);
         };
 
-        setTimeout(() => {
-            if (!websocketWorked && ws.readyState !== WebSocket.OPEN) {
-                try {
-                    ws.close();
-                } catch (_) {}
+    } catch (error) {
+        terminalLog(
+            "WebSocket unavailable. Using polling.",
+            "error"
+        );
 
-                pollJob(jobId);
-            }
-        }, 2500);
-
-    } catch (_) {
-        pollJob(jobId);
+        startJobPolling(jobId);
     }
+}
+
+
+function startJobPolling(jobId) {
+    if (pollTimer) {
+        return;
+    }
+
+    pollTimer = setInterval(
+        () => pollJob(jobId),
+        1500
+    );
+
+    pollJob(jobId);
 }
 
 
 async function pollJob(jobId) {
-    terminalLog("Polling job status...");
+    try {
+        const result = await api(
+            `/api/jobs/${jobId}`
+        );
 
-    let finished = false;
-
-    while (!finished) {
-        try {
-            const data = await api(`/api/jobs/${jobId}`);
-
-            const job = data.job || data;
-            const events = data.events || [];
-
-            if (events.length) {
-                const latest = events[events.length - 1];
-
-                const message =
-                    latest.message ||
-                    latest.event ||
-                    latest.status ||
-                    JSON.stringify(latest);
-
-                terminalLog(message);
-            }
-
-            const status = job.status || "";
-
-            if (
-                status === "completed" ||
-                status === "success" ||
-                status === "done"
-            ) {
-                terminalSuccess("Job completed.");
-                finished = true;
-                await loadCurrentInvestigation();
-                break;
-            }
-
-            if (
-                status === "failed" ||
-                status === "error"
-            ) {
-                terminalError(
-                    job.error ||
-                    job.message ||
-                    "Job failed."
-                );
-                finished = true;
-                break;
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-        } catch (error) {
-            terminalError(error.message);
-            finished = true;
+        if (result.job) {
+            handleJobEvent({
+                event_type: "job_status",
+                status: result.job.status,
+                message: result.job.message || "",
+                payload: result.job
+            });
         }
+
+        if (
+            result.job?.status === "completed" ||
+            result.job?.status === "failed" ||
+            result.job?.status === "error"
+        ) {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+
+            await loadCurrentInvestigation();
+            await loadStats();
+        }
+
+    } catch (error) {
+        console.error("Job polling failed:", error);
     }
 }
 
 
 /* =========================
-   CRAWLER
+   JOB EVENTS
 ========================= */
 
-async function startCrawl() {
-    clearTerminal();
+function handleJobEvent(event) {
+    const status =
+        event.status ||
+        event.payload?.status ||
+        "";
 
-    const urlInput = $("crawlUrl");
-    const targetInput = $("crawlTarget");
+    const message =
+        event.message ||
+        event.payload?.message ||
+        "";
 
-    const url = urlInput ? urlInput.value.trim() : "";
-    const target = targetInput ? targetInput.value.trim() : "";
-
-    if (!url) {
-        terminalError("Enter a URL to crawl.");
-        return;
+    if (message) {
+        terminalLog(
+            message,
+            String(status).toLowerCase() === "error"
+                ? "error"
+                : "info"
+        );
     }
 
-    terminalLog("Preparing crawler...");
-    terminalLog(`Target URL: ${url}`);
-
-    if (target) {
-        terminalLog(`Target actor/username: ${target}`);
+    if (status) {
+        updateJobStatus(status);
     }
 
-    try {
-        const payload = {
-            urls: [url],
-            target: target || null
-        };
+    if (
+        String(status).toLowerCase() === "completed"
+    ) {
+        terminalLog(
+            "Job completed successfully.",
+            "success"
+        );
 
-        terminalLog("Sending crawl request...");
+        loadCurrentInvestigation();
+        loadStats();
+    }
 
-        const data = await api("/api/crawl", {
-            method: "POST",
-            body: JSON.stringify(payload)
-        });
-
-        terminalSuccess("Crawler request accepted.");
-
-        if (data.investigation_id) {
-            terminalLog(
-                `Investigation ID: ${data.investigation_id}`
-            );
-        }
-
-        if (data.job_id) {
-            terminalLog(`Job ID: ${data.job_id}`);
-            await followJob(data.job_id);
-        } else if (data.id) {
-            terminalLog(`Job ID: ${data.id}`);
-            await followJob(data.id);
-        } else {
-            terminalWarning(
-                "Crawler returned no job ID."
-            );
-        }
-
-        await loadCurrentInvestigation();
-        await refreshOverview();
-
-    } catch (error) {
-        terminalError(`Crawler error: ${error.message}`);
+    if (
+        ["failed", "error"].includes(
+            String(status).toLowerCase()
+        )
+    ) {
+        terminalLog(
+            "Job failed.",
+            "error"
+        );
     }
 }
 
 
 /* =========================
-   MANUAL OSINT
-========================= */
-
-async function startManual() {
-    clearTerminal();
-
-    const targetInput = $("manualTarget");
-    const typeInput = $("manualType");
-
-    const target = targetInput ? targetInput.value.trim() : "";
-    const targetType = typeInput ? typeInput.value : "other";
-
-    if (!target) {
-        terminalError("Enter a target.");
-        return;
-    }
-
-    terminalLog("Preparing OSINT investigation...");
-    terminalLog(`Target: ${target}`);
-    terminalLog(`Type: ${targetType}`);
-
-    try {
-        const payload = {
-            target: target,
-            target_type: targetType
-        };
-
-        terminalLog("Sending OSINT request...");
-
-        const data = await api("/api/investigate", {
-            method: "POST",
-            body: JSON.stringify(payload)
-        });
-
-        terminalSuccess("OSINT request accepted.");
-
-        if (data.investigation_id) {
-            terminalLog(
-                `Investigation ID: ${data.investigation_id}`
-            );
-        }
-
-        if (data.job_id) {
-            terminalLog(`Job ID: ${data.job_id}`);
-            await followJob(data.job_id);
-        } else if (data.id) {
-            terminalLog(`Job ID: ${data.id}`);
-            await followJob(data.id);
-        } else {
-            terminalWarning(
-                "OSINT engine returned no job ID."
-            );
-        }
-
-        await loadCurrentInvestigation();
-        await refreshOverview();
-
-    } catch (error) {
-        terminalError(`OSINT error: ${error.message}`);
-    }
-}
-
-
-  /* =========================
-   CURRENT INVESTIGATION
+   LOAD CURRENT INVESTIGATION
 ========================= */
 
 async function loadCurrentInvestigation() {
+    if (!currentInvestigationId) {
+        return;
+    }
+
     try {
-        const iid =
-            localStorage.getItem("current_investigation_id");
-
-        if (!iid) return;
-
         const data = await api(
-            `/api/investigations/${encodeURIComponent(iid)}`
+            `/api/investigations/${encodeURIComponent(
+                currentInvestigationId
+            )}`
         );
 
         renderCurrentInvestigation(data);
 
     } catch (error) {
-        terminalWarning(
-            `Could not load investigation: ${error.message}`
+        console.error(
+            "Failed to load current investigation:",
+            error
         );
     }
 }
 
+
+/* =========================
+   RENDER CURRENT FINDINGS
+========================= */
 
 function renderCurrentInvestigation(data) {
     const findings =
@@ -1392,802 +1548,740 @@ function renderCurrentInvestigation(data) {
         data.result?.findings ||
         [];
 
-    const tableBody = $("currentFindingsBody");
+    const count = $("currentFindingCount");
 
-    if (!tableBody) return;
+    if (count) {
+        count.textContent = findings.length;
+    }
 
-    if (!findings.length) {
-        tableBody.innerHTML = `
-            <tr>
-                <td colspan="7" class="empty-state">
-                    No findings yet.
-                </td>
-            </tr>
-        `;
+    const tbody = $("currentFindings");
+
+    if (!tbody) {
         return;
     }
 
-    tableBody.innerHTML = findings
-        .map(renderFindingRow)
-        .join("");
-}
+    tbody.innerHTML = "";
 
+    if (!findings.length) {
+        const row = document.createElement("tr");
 
-function renderFindingRow(finding) {
-    const type =
-        finding.finding_type ||
-        finding.type ||
-        "other";
-
-    const value =
-        finding.value ||
-        "-";
-
-    const source =
-        finding.source ||
-        "unknown";
-
-    const confidence =
-        finding.confidence !== undefined &&
-        finding.confidence !== null
-            ? Number(finding.confidence).toFixed(2)
-            : "-";
-
-    const sourceUrl =
-        finding.source_url ||
-        "";
-
-    const firstSeen =
-        finding.first_seen ||
-        finding.collected_at ||
-        "-";
-
-    return `
-        <tr>
-            <td>${escapeHtml(type)}</td>
-
-            <td class="finding-value">
-                ${escapeHtml(value)}
+        row.innerHTML = `
+            <td colspan="6">
+                No findings yet.
             </td>
+        `;
 
-            <td>
-                ${escapeHtml(source)}
-            </td>
+        tbody.appendChild(row);
 
-            <td>
-                ${escapeHtml(confidence)}
-            </td>
+        return;
+    }
 
-            <td>
-                ${
-                    sourceUrl
-                    ? `<a href="${escapeHtml(sourceUrl)}"
-                         target="_blank"
-                         rel="noopener noreferrer">
-                         Source
-                       </a>`
-                    : "-"
-                }
-            </td>
+    findings.forEach((finding, index) => {
+        const row = document.createElement("tr");
 
-            <td>
-                ${escapeHtml(firstSeen)}
-            </td>
+        const confidence =
+            finding.confidence !== undefined &&
+            finding.confidence !== null
+                ? `${Math.round(
+                    Number(finding.confidence) * 100
+                  )}%`
+                : "—";
 
-            <td>
-                <button
-                    class="small-btn"
-                    onclick='viewFinding(${JSON.stringify(finding)})'>
-                    View
-                </button>
-            </td>
-        </tr>
-    `;
-}
+        row.innerHTML = `
+            <td>${escapeHtml(
+                finding.finding_type || "other"
+            )}</td>
+
+            <td>${escapeHtml(
+                finding.value || "—"
+            )}</td>
+
+            <td>${escapeHtml(
+                finding.source || "—"
+            )}</td>
+
+            <td>${escapeHtml(
+                finding.source_url || "—"
+            )}</td>
+
+            <td>${escapeHtml(
+const $ = (id) => document.getElementById(id);
+
+let currentJobId = null;
+let currentInvestigationId = localStorage.getItem("currentInvestigationId") || null;
+let currentActorId = localStorage.getItem("currentActorId") || null;
+let jobSocket = null;
+let pollTimer = null;
 
 
-function viewFinding(finding) {
-    const metadata =
-        finding.metadata || {};
+/* =========================
+   API HELPER
+========================= */
 
-    const evidence =
-        finding.evidence || [];
+async function api(url, options = {}) {
+    const response = await fetch(url, {
+        headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {})
+        },
+        ...options
+    });
 
-    const text = `
-Finding type: ${finding.finding_type || finding.type || "-"}
-Value: ${finding.value || "-"}
-Source: ${finding.source || "-"}
-Source URL: ${finding.source_url || "-"}
-Confidence: ${finding.confidence ?? "-"}
-First seen: ${finding.first_seen || "-"}
-Last seen: ${finding.last_seen || "-"}
-Evidence count: ${evidence.length}
+    let data = null;
 
-Metadata:
-${JSON.stringify(metadata, null, 2)}
-    `.trim();
+    try {
+        data = await response.json();
+    } catch (_) {
+        data = null;
+    }
 
-    alert(text);
+    if (!response.ok) {
+        const message =
+            data?.detail ||
+            data?.error ||
+            `Request failed (${response.status})`;
+
+        throw new Error(message);
+    }
+
+    return data;
 }
 
 
 /* =========================
-   OVERVIEW
+   PAGE NAVIGATION
 ========================= */
 
-async function refreshOverview() {
+function showPage(pageId, button) {
+    // Actual HTML uses section.hidden, not .page/.active
+    document.querySelectorAll("main > section").forEach(section => {
+        section.classList.add("hidden");
+    });
+
+    const page = $(pageId);
+
+    if (page) {
+        page.classList.remove("hidden");
+    }
+
+    // Actual navigation uses normal buttons
+    document.querySelectorAll("nav button").forEach(btn => {
+        btn.classList.remove("active");
+    });
+
+    if (button) {
+        button.classList.add("active");
+    }
+
+    // Load page-specific data
+    if (pageId === "overview") {
+        loadStats();
+    }
+
+    if (pageId === "history") {
+        loadInvestigations();
+    }
+
+    if (pageId === "findings") {
+        loadFindings();
+    }
+
+    if (pageId === "alerts") {
+        loadAlerts();
+    }
+
+    if (pageId === "watch") {
+        loadWatchlist();
+    }
+}
+
+
+/* =========================
+   TERMINAL
+========================= */
+
+function terminalLog(message, type = "info") {
+    const terminal = $("terminal");
+
+    if (!terminal) {
+        return;
+    }
+
+    const time = new Date().toLocaleTimeString();
+
+    const line = document.createElement("div");
+
+    line.className = `terminal-line ${type}`;
+
+    line.textContent = `[${time}] ${message}`;
+
+    terminal.appendChild(line);
+
+    terminal.scrollTop = terminal.scrollHeight;
+}
+
+
+function overviewLog(message, type = "info") {
+    const terminal = $("overviewTerminal");
+
+    if (!terminal) {
+        return;
+    }
+
+    const time = new Date().toLocaleTimeString();
+
+    const line = document.createElement("div");
+
+    line.className = `terminal-line ${type}`;
+
+    line.textContent = `[${time}] ${message}`;
+
+    terminal.appendChild(line);
+
+    terminal.scrollTop = terminal.scrollHeight;
+}
+
+
+/* =========================
+   CURRENT INVESTIGATION
+========================= */
+
+function setCurrentInvestigation(investigationId, actorId = null) {
+    currentInvestigationId = investigationId;
+    currentActorId = actorId;
+
+    if (investigationId) {
+        localStorage.setItem(
+            "currentInvestigationId",
+            investigationId
+        );
+    }
+
+    if (actorId) {
+        localStorage.setItem(
+            "currentActorId",
+            actorId
+        );
+    }
+
+    loadCurrentInvestigation();
+}
+
+
+/* =========================
+   START CRAWL
+========================= */
+
+async function startCrawl() {
+    const urlInput = $("url");
+    const targetInput = $("target");
+
+    const urlText = urlInput?.value.trim() || "";
+    const target = targetInput?.value.trim() || "";
+
+    if (!urlText) {
+        terminalLog("Please enter at least one URL.", "error");
+        return;
+    }
+
+    const urls = urlText
+        .split(/\r?\n/)
+        .map(url => url.trim())
+        .filter(Boolean);
+
+    const button = document.querySelector(
+        'button[onclick="startCrawl()"]'
+    );
+
+    if (button) {
+        button.disabled = true;
+    }
+
+    terminalLog("Starting crawler...", "info");
+
     try {
-        const investigations =
-            await api("/api/investigations");
+        const result = await api("/api/crawl", {
+            method: "POST",
+            body: JSON.stringify({
+                urls: urls,
+                target: target || null,
+                workers: 3
+            })
+        });
 
-        const findings =
-            await api("/api/findings");
+        currentJobId = result.job_id;
 
-        const alerts =
-            await api("/api/alerts");
+        setCurrentInvestigation(
+            result.investigation_id,
+            result.actor_id
+        );
 
-        const watchlist =
-            await api("/api/watchlist");
+        terminalLog(
+            `Investigation created: ${result.investigation_id}`,
+            "success"
+        );
 
-        const investigationList =
-            Array.isArray(investigations)
-                ? investigations
-                : investigations.items || [];
+        terminalLog(
+            `Crawler job started: ${result.job_id}`,
+            "success"
+        );
 
-        const findingList =
-            Array.isArray(findings)
-                ? findings
-                : findings.items || [];
+        updateJobStatus("RUNNING");
 
-        const alertList =
-            Array.isArray(alerts)
-                ? alerts
-                : alerts.items || [];
+        followJob(result.job_id);
 
-        const watchlistItems =
-            Array.isArray(watchlist)
-                ? watchlist
-                : watchlist.items || [];
+    } catch (error) {
+        terminalLog(
+            `Crawler error: ${error.message}`,
+            "error"
+        );
 
-        if ($("statInvestigations")) {
-            $("statInvestigations").textContent =
-                investigationList.length;
+        updateJobStatus("ERROR");
+
+    } finally {
+        if (button) {
+            button.disabled = false;
+        }
+    }
+}
+
+
+/* =========================
+   START MANUAL OSINT
+========================= */
+
+async function startManual() {
+    const targetInput = $("manual");
+    const typeInput = $("type");
+
+    const target = targetInput?.value.trim() || "";
+    const targetType = typeInput?.value || "other";
+
+    if (!target) {
+        terminalLog(
+            "Please enter a target.",
+            "error"
+        );
+        return;
+    }
+
+    const button = document.querySelector(
+        'button[onclick="startManual()"]'
+    );
+
+    if (button) {
+        button.disabled = true;
+    }
+
+    terminalLog(
+        `Starting OSINT investigation for ${target}...`,
+        "info"
+    );
+
+    try {
+        const result = await api("/api/investigate", {
+            method: "POST",
+            body: JSON.stringify({
+                target: target,
+                target_type: targetType,
+                notes: null
+            })
+        });
+
+        currentJobId = result.job_id;
+
+        setCurrentInvestigation(
+            result.investigation_id,
+            result.actor_id
+        );
+
+        terminalLog(
+            `Investigation created: ${result.investigation_id}`,
+            "success"
+        );
+
+        terminalLog(
+            `OSINT job started: ${result.job_id}`,
+            "success"
+        );
+
+        updateJobStatus("RUNNING");
+
+        followJob(result.job_id);
+
+    } catch (error) {
+        terminalLog(
+            `OSINT error: ${error.message}`,
+            "error"
+        );
+
+        updateJobStatus("ERROR");
+
+    } finally {
+        if (button) {
+            button.disabled = false;
+        }
+    }
+}
+
+
+/* =========================
+   JOB STATUS
+========================= */
+
+function updateJobStatus(status) {
+    const element = $("jobStatus");
+
+    if (!element) {
+        return;
+    }
+
+    element.textContent = status;
+
+    element.className = "";
+
+    const normalized = String(status).toLowerCase();
+
+    if (normalized === "completed" || normalized === "success") {
+        element.classList.add("success");
+    } else if (
+        normalized === "failed" ||
+        normalized === "error"
+    ) {
+        element.classList.add("error");
+    } else if (normalized === "running") {
+        element.classList.add("running");
+    }
+}
+
+
+/* =========================
+   JOB MONITORING
+========================= */
+
+function followJob(jobId) {
+    currentJobId = jobId;
+
+    // Close old socket
+    if (jobSocket) {
+        try {
+            jobSocket.close();
+        } catch (_) {}
+        jobSocket = null;
+    }
+
+    // Stop old polling
+    if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+
+    const protocol =
+        window.location.protocol === "https:"
+            ? "wss:"
+            : "ws:";
+
+    const wsUrl =
+        `${protocol}//${window.location.host}/ws/jobs/${jobId}`;
+
+    try {
+        jobSocket = new WebSocket(wsUrl);
+
+        jobSocket.onopen = () => {
+            terminalLog(
+                "Connected to live job monitor.",
+                "success"
+            );
+        };
+
+        jobSocket.onmessage = event => {
+            try {
+                const data = JSON.parse(event.data);
+
+                handleJobEvent(data);
+            } catch (error) {
+                terminalLog(
+                    "Received invalid job event.",
+                    "error"
+                );
+            }
+        };
+
+        jobSocket.onerror = () => {
+            terminalLog(
+                "Live monitor unavailable. Switching to polling.",
+                "error"
+            );
+
+            startJobPolling(jobId);
+        };
+
+        jobSocket.onclose = () => {
+            // Polling will keep status updated if the socket closes.
+            startJobPolling(jobId);
+        };
+
+    } catch (error) {
+        terminalLog(
+            "WebSocket unavailable. Using polling.",
+            "error"
+        );
+
+        startJobPolling(jobId);
+    }
+}
+
+
+function startJobPolling(jobId) {
+    if (pollTimer) {
+        return;
+    }
+
+    pollTimer = setInterval(
+        () => pollJob(jobId),
+        1500
+    );
+
+    pollJob(jobId);
+}
+
+
+async function pollJob(jobId) {
+    try {
+        const result = await api(
+            `/api/jobs/${jobId}`
+        );
+
+        if (result.job) {
+            handleJobEvent({
+                event_type: "job_status",
+                status: result.job.status,
+                message: result.job.message || "",
+                payload: result.job
+            });
         }
 
-        if ($("statFindings")) {
-            $("statFindings").textContent =
-                findingList.length;
+        if (
+            result.job?.status === "completed" ||
+            result.job?.status === "failed" ||
+            result.job?.status === "error"
+        ) {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+
+            await loadCurrentInvestigation();
+            await loadStats();
         }
 
-        if ($("statActors")) {
-            $("statActors").textContent =
-                watchlistItems.length;
-        }
+    } catch (error) {
+        console.error("Job polling failed:", error);
+    }
+}
 
-        if ($("statAlerts")) {
-            $("statAlerts").textContent =
-                alertList.filter(
-                    alert => !alert.read
-                ).length;
-        }
 
-        renderRecentAlerts(alertList);
+/* =========================
+   JOB EVENTS
+========================= */
+
+function handleJobEvent(event) {
+    const status =
+        event.status ||
+        event.payload?.status ||
+        "";
+
+    const message =
+        event.message ||
+        event.payload?.message ||
+        "";
+
+    if (message) {
+        terminalLog(
+            message,
+            String(status).toLowerCase() === "error"
+                ? "error"
+                : "info"
+        );
+    }
+
+    if (status) {
+        updateJobStatus(status);
+    }
+
+    if (
+        String(status).toLowerCase() === "completed"
+    ) {
+        terminalLog(
+            "Job completed successfully.",
+            "success"
+        );
+
+        loadCurrentInvestigation();
+        loadStats();
+    }
+
+    if (
+        ["failed", "error"].includes(
+            String(status).toLowerCase()
+        )
+    ) {
+        terminalLog(
+            "Job failed.",
+            "error"
+        );
+    }
+}
+
+
+/* =========================
+   LOAD CURRENT INVESTIGATION
+========================= */
+
+async function loadCurrentInvestigation() {
+    if (!currentInvestigationId) {
+        return;
+    }
+
+    try {
+        const data = await api(
+            `/api/investigations/${encodeURIComponent(
+                currentInvestigationId
+            )}`
+        );
+
+        renderCurrentInvestigation(data);
 
     } catch (error) {
         console.error(
-            "Overview refresh failed:",
+            "Failed to load current investigation:",
             error
         );
     }
 }
 
 
-function renderRecentAlerts(alerts) {
-    const container =
-        $("recentAlerts");
+/* =========================
+   RENDER CURRENT FINDINGS
+========================= */
 
-    if (!container) return;
+function renderCurrentInvestigation(data) {
+    const findings =
+        data.findings ||
+        data.result?.findings ||
+        [];
 
-    if (!alerts.length) {
-        container.innerHTML = `
-            <div class="empty-state">
-                No alerts.
-            </div>
-        `;
+    const count = $("currentFindingCount");
+
+    if (count) {
+        count.textContent = findings.length;
+    }
+
+    const tbody = $("currentFindings");
+
+    if (!tbody) {
         return;
     }
 
-    const recent =
-        [...alerts]
-            .sort(
-                (a, b) =>
-                    new Date(
-                        b.created_at ||
-                        b.timestamp ||
-                        0
-                    ) -
-                    new Date(
-                        a.created_at ||
-                        a.timestamp ||
-                        0
-                    )
-            )
-            .slice(0, 5);
+    tbody.innerHTML = "";
 
-    container.innerHTML = recent
-        .map(alert => `
-            <div class="alert-item">
-                <div>
-                    <strong>
-                        ${escapeHtml(
-                            alert.title ||
-                            alert.message ||
-                            "Alert"
-                        )}
-                    </strong>
+    if (!findings.length) {
+        const row = document.createElement("tr");
 
-                    <div class="muted">
-                        ${escapeHtml(
-                            alert.created_at ||
-                            alert.timestamp ||
-                            ""
-                        )}
-                    </div>
-                </div>
-            </div>
-        `)
-        .join("");
-}
-
-
-/* =========================
-   INVESTIGATIONS
-========================= */
-
-async function loadInvestigations() {
-    const tbody =
-        $("investigationsBody");
-
-    if (!tbody) return;
-
-    tbody.innerHTML = `
-        <tr>
+        row.innerHTML = `
             <td colspan="6">
-                Loading investigations...
+                No findings yet.
             </td>
-        </tr>
-    `;
-
-    try {
-        const data =
-            await api("/api/investigations");
-
-        const items =
-            Array.isArray(data)
-                ? data
-                : data.items || [];
-
-        if (!items.length) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6"
-                        class="empty-state">
-                        No investigations found.
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        tbody.innerHTML = items
-            .map(item => {
-                const iid =
-                    item.investigation_id ||
-                    item.id ||
-                    "";
-
-                return `
-                    <tr>
-                        <td>
-                            ${escapeHtml(iid)}
-                        </td>
-
-                        <td>
-                            ${escapeHtml(
-                                item.actor_id ||
-                                item.target ||
-                                "-"
-                            )}
-                        </td>
-
-                        <td>
-                            ${escapeHtml(
-                                item.status ||
-                                "-"
-                            )}
-                        </td>
-
-                        <td>
-                            ${escapeHtml(
-                                String(
-                                    item.findings_count ??
-                                    item.finding_count ??
-                                    0
-                                )
-                            )}
-                        </td>
-
-                        <td>
-                            ${escapeHtml(
-                                item.created_at ||
-                                "-"
-                            )}
-                        </td>
-
-                        <td>
-                            <button
-                                class="small-btn"
-                                onclick="viewInvestigation('${escapeHtml(iid)}')">
-                                Open
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            })
-            .join("");
-
-    } catch (error) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6"
-                    class="error">
-                    ${escapeHtml(error.message)}
-                </td>
-            </tr>
         `;
-    }
-}
 
+        tbody.appendChild(row);
 
-async function viewInvestigation(iid) {
-    try {
-        localStorage.setItem(
-            "current_investigation_id",
-            iid
-        );
-
-        const data =
-            await api(
-                `/api/investigations/${encodeURIComponent(iid)}`
-            );
-
-        renderCurrentInvestigation(data);
-
-        const detail =
-            $("historyDetail");
-
-        if (detail) {
-            detail.classList.remove("hidden");
-
-            const title =
-                $("historyDetailTitle");
-
-            if (title) {
-                title.textContent =
-                    `Investigation ${iid}`;
-            }
-
-            const content =
-                $("historyDetailContent");
-
-            if (content) {
-                content.textContent =
-                    JSON.stringify(
-                        data,
-                        null,
-                        2
-                    );
-            }
-        }
-
-        showPage("overview");
-
-    } catch (error) {
-        alert(
-            `Failed to open investigation: ${error.message}`
-        );
-    }
-}
-
-
-function closeHistoryDetail() {
-    const detail =
-        $("historyDetail");
-
-    if (detail) {
-        detail.classList.add("hidden");
-    }
-}
-
-
-/* =========================
-   FINDINGS
-========================= */
-
-async function loadFindings() {
-    const tbody =
-        $("findingsBody");
-
-    if (!tbody) return;
-
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="7">
-                Loading findings...
-            </td>
-        </tr>
-    `;
-
-    try {
-        const search =
-            $("findingSearch")?.value.trim() || "";
-
-        const type =
-            $("findingType")?.value || "";
-
-        const params =
-            new URLSearchParams();
-
-        if (search) {
-            params.set("q", search);
-        }
-
-        if (type) {
-            params.set(
-                "finding_type",
-                type
-            );
-        }
-
-        const query =
-            params.toString()
-                ? `?${params.toString()}`
-                : "";
-
-        const data =
-            await api(
-                `/api/findings${query}`
-            );
-
-        const items =
-            Array.isArray(data)
-                ? data
-                : data.items || [];
-
-        if (!items.length) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="7"
-                        class="empty-state">
-                        No findings found.
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        tbody.innerHTML =
-            items.map(renderFindingRow)
-                .join("");
-
-    } catch (error) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="7"
-                    class="error">
-                    ${escapeHtml(error.message)}
-                </td>
-            </tr>
-        `;
-    }
-}
-
-
-/* =========================
-   ALERTS
-========================= */
-
-async function loadAlerts() {
-    const container =
-        $("alertsList");
-
-    if (!container) return;
-
-    container.innerHTML =
-        `<div class="muted">Loading alerts...</div>`;
-
-    try {
-        const data =
-            await api("/api/alerts");
-
-        const alerts =
-            Array.isArray(data)
-                ? data
-                : data.items || [];
-
-        if (!alerts.length) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    No alerts.
-                </div>
-            `;
-            return;
-        }
-
-        container.innerHTML =
-            alerts.map(alert => `
-                <div class="alert-card
-                    ${alert.read ? "read" : "unread"}">
-
-                    <div class="alert-main">
-                        <strong>
-                            ${escapeHtml(
-                                alert.title ||
-                                "Alert"
-                            )}
-                        </strong>
-
-                        <p>
-                            ${escapeHtml(
-                                alert.message ||
-                                alert.description ||
-                                ""
-                            )}
-                        </p>
-
-                        <small>
-                            ${escapeHtml(
-                                alert.created_at ||
-                                alert.timestamp ||
-                                ""
-                            )}
-                        </small>
-                    </div>
-
-                    ${
-                        alert.read
-                        ? ""
-                        : `
-                            <button
-                                class="small-btn"
-                                onclick="markAlertRead('${escapeHtml(
-                                    alert.id ||
-                                    alert.alert_id ||
-                                    ""
-                                )}')">
-                                Mark read
-                            </button>
-                        `
-                    }
-                </div>
-            `).join("");
-
-    } catch (error) {
-        container.innerHTML = `
-            <div class="error">
-                ${escapeHtml(error.message)}
-            </div>
-        `;
-    }
-}
-
-
-async function markAlertRead(alertId) {
-    if (!alertId) return;
-
-    try {
-        await api(
-            `/api/alerts/${encodeURIComponent(alertId)}/read`,
-            {
-                method: "POST"
-            }
-        );
-
-        await loadAlerts();
-        await refreshOverview();
-
-    } catch (error) {
-        alert(
-            `Could not update alert: ${error.message}`
-        );
-    }
-}
-
-
-/* =========================
-   WATCHLIST
-========================= */
-
-async function loadWatchlist() {
-    const tbody =
-        $("watchlistBody");
-
-    if (!tbody) return;
-
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="6">
-                Loading watchlist...
-            </td>
-        </tr>
-    `;
-
-    try {
-        const data =
-            await api("/api/watchlist");
-
-        const items =
-            Array.isArray(data)
-                ? data
-                : data.items || [];
-
-        if (!items.length) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6"
-                        class="empty-state">
-                        No tracked actors.
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        tbody.innerHTML =
-            items.map(item => `
-                <tr>
-                    <td>
-                        ${escapeHtml(
-                            item.actor_id ||
-                            item.id ||
-                            "-"
-                        )}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(
-                            item.name ||
-                            item.username ||
-                            item.value ||
-                            "-"
-                        )}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(
-                            item.platform ||
-                            item.source ||
-                            "-"
-                        )}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(
-                            item.status ||
-                            "active"
-                        )}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(
-                            item.last_scanned ||
-                            item.updated_at ||
-                            "-"
-                        )}
-                    </td>
-
-                    <td>
-                        <button
-                            class="small-btn danger"
-                            onclick="removeWatch('${escapeHtml(
-                                item.id ||
-                                item.watchlist_id ||
-                                item.actor_id ||
-                                ""
-                            )}')">
-                            Remove
-                        </button>
-                    </td>
-                </tr>
-            `).join("");
-
-    } catch (error) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6"
-                    class="error">
-                    ${escapeHtml(error.message)}
-                </td>
-            </tr>
-        `;
-    }
-}
-
-
-async function removeWatch(id) {
-    if (!id) return;
-
-    if (!confirm(
-        "Remove this actor from the watchlist?"
-    )) {
         return;
     }
 
-    try {
-        await api(
-            `/api/watchlist/${encodeURIComponent(id)}`,
-            {
-                method: "DELETE"
-            }
-        );
+    findings.forEach((finding, index) => {
+        const row = document.createElement("tr");
 
-        await loadWatchlist();
-        await refreshOverview();
+        const confidence =
+            finding.confidence !== undefined &&
+            finding.confidence !== null
+                ? `${Math.round(
+                    Number(finding.confidence) * 100
+                  )}%`
+                : "—";
 
-    } catch (error) {
-        alert(
-            `Could not remove actor: ${error.message}`
-        );
-    }
+        row.innerHTML = `
+            <td>${escapeHtml(
+                finding.finding_type || "other"
+            )}</td>
+
+            <td>${escapeHtml(
+                finding.value || "—"
+            )}</td>
+
+            <td>${escapeHtml(
+                finding.source || "—"
+            )}</td>
+
+            <td>${escapeHtml(
+                finding.source_url || "—"
+            )}</td>
+
+            <td>${escapeHtml(
+                confidence
+            )}</td>
+
+            <td>
+                <button
+                    type="button"
+                    onclick="viewFinding(${index})">
+                    View
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(row);
+    });
 }
 
 
 /* =========================
-   INITIAL LOAD
+   FINDING VIEWER
 ========================= */
 
-async function loadAll() {
-    await refreshOverview();
-    await loadCurrentInvestigation();
-}
+let currentFindingsCache = [];
 
-document.addEventListener(
-    "DOMContentLoaded",
-    () => {
-        loadAll();
+function viewFinding(index) {
+    const finding = currentFindingsCache[index];
 
-        setInterval(
-            refreshOverview,
-            10000
-        );
+    if (!finding) {
+        return;
     }
-);
+
+    alert(
+        JSON.stringify(
+            finding,
+            null,
+            2
+        )
+    );
+}
 
 
 /* =========================
-   NAVIGATION CLICK HANDLER
+   HTML ESCAPING
 ========================= */
 
-document.addEventListener(
-    "click",
-    event => {
-        const item =
-            event.target.closest(
-                ".nav-item"
-            );
-
-        if (!item) return;
-
-        const page =
-            item.dataset.page;
-
-        if (page) {
-            event.preventDefault();
-            showPage(page);
-        }
-    }
-);
-</script>
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}git
+    
+    </script>
 
 </body>
 </html>
