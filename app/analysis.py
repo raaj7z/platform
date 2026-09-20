@@ -1,18 +1,4 @@
-"""
-PRALAYX Analysis Engine
 
-Provides:
-- Stylometric feature extraction
-- Behavioral feature extraction
-- Stylometric similarity comparison
-- Behavioral similarity comparison
-- Combined persona similarity
-- Evidence-aware confidence calculation
-- Analysis persistence helpers
-
-This module is intentionally conservative:
-similarity is treated as an attribution lead, not proof of identity.
-"""
 
 from __future__ import annotations
 
