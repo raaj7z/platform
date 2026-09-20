@@ -1,8 +1,6 @@
-
-
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import datetime
 import math
@@ -11,14 +9,27 @@ from statistics import mean, pstdev
 from typing import Any, Iterable, Optional
 
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+# ============================================================================
+# CONSTANTS
+# ============================================================================
 
-WORD_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ0-9']+")
-SENTENCE_RE = re.compile(r"[.!?]+")
+WORD_RE = re.compile(
+    r"[A-Za-zÀ-ÖØ-öø-ÿ0-9']+"
+)
 
-PUNCTUATION_CHARS = set("!?;,:-")
+SENTENCE_RE = re.compile(
+    r"[.!?]+"
+)
+
+URL_RE = re.compile(
+    r"https?://\S+|www\.\S+",
+    flags=re.IGNORECASE,
+)
+
+PUNCTUATION_CHARS = set(
+    "!?;,:-"
+)
+
 COMMON_FUNCTION_WORDS = {
     "the",
     "a",
@@ -59,9 +70,9 @@ COMMON_FUNCTION_WORDS = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Data structures
-# ---------------------------------------------------------------------------
+# ============================================================================
+# DATA STRUCTURES
+# ============================================================================
 
 @dataclass
 class StylometricProfile:
@@ -94,7 +105,10 @@ class StylometricProfile:
 
     @property
     def usable(self) -> bool:
-        return self.status == "ok" and self.words >= 20
+        return (
+            self.status == "ok"
+            and self.words >= 20
+        )
 
 
 @dataclass
@@ -116,7 +130,10 @@ class BehavioralProfile:
 
     @property
     def usable(self) -> bool:
-        return self.status == "ok" and self.posts >= 2
+        return (
+            self.status == "ok"
+            and self.posts >= 2
+        )
 
 
 @dataclass
@@ -132,23 +149,54 @@ class SimilarityResult:
         return asdict(self)
 
 
-# ---------------------------------------------------------------------------
-# Normalization helpers
-# ---------------------------------------------------------------------------
+# ============================================================================
+# GENERAL HELPERS
+# ============================================================================
 
 def _safe_text(value: Any) -> str:
     if value is None:
         return ""
+
     return str(value).strip()
 
 
-def _extract_text(post: dict[str, Any]) -> str:
-    """
-    Accept several common crawler/OSINT field names.
+def _safe_ratio(
+    numerator: float,
+    denominator: float,
+) -> float:
+    if denominator <= 0:
+        return 0.0
 
-    This keeps analysis compatible with raw crawler records without forcing
-    every upstream module to use exactly the same field name.
+    return numerator / denominator
+
+
+def _clamp(
+    value: float,
+    low: float = 0.0,
+    high: float = 1.0,
+) -> float:
+    return max(
+        low,
+        min(high, float(value)),
+    )
+
+
+def tokenize(text: str) -> list[str]:
+    return WORD_RE.findall(
+        _safe_text(text).lower()
+    )
+
+
+def _extract_text(
+    post: dict[str, Any],
+) -> str:
     """
+    Accept multiple common crawler/OSINT field names.
+
+    This allows analysis to work with existing crawler output
+    without forcing upstream modules to rename their fields.
+    """
+
     for key in (
         "content",
         "text",
@@ -159,18 +207,18 @@ def _extract_text(post: dict[str, Any]) -> str:
         "excerpt",
     ):
         value = post.get(key)
+
         if value:
             return _safe_text(value)
 
     return ""
 
 
-def tokenize(text: str) -> list[str]:
-    return WORD_RE.findall(_safe_text(text).lower())
-
-
-def _sentences(text: str) -> list[str]:
+def _sentences(
+    text: str,
+) -> list[str]:
     text = _safe_text(text)
+
     if not text:
         return []
 
@@ -181,7 +229,9 @@ def _sentences(text: str) -> list[str]:
     ]
 
 
-def _parse_timestamp(value: Any) -> Optional[datetime]:
+def _parse_timestamp(
+    value: Any,
+) -> Optional[datetime]:
     if not value:
         return None
 
@@ -190,13 +240,16 @@ def _parse_timestamp(value: Any) -> Optional[datetime]:
 
     raw = _safe_text(value)
 
-    # ISO timestamps.
     try:
-        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        return datetime.fromisoformat(
+            raw.replace(
+                "Z",
+                "+00:00",
+            )
+        )
     except ValueError:
         pass
 
-    # Common crawler timestamp formats.
     formats = (
         "%Y-%m-%d %H:%M:%S",
         "%Y-%m-%d",
@@ -208,38 +261,41 @@ def _parse_timestamp(value: Any) -> Optional[datetime]:
 
     for fmt in formats:
         try:
-            return datetime.strptime(raw, fmt)
+            return datetime.strptime(
+                raw,
+                fmt,
+            )
         except ValueError:
             continue
 
     return None
 
 
-def _safe_ratio(numerator: float, denominator: float) -> float:
-    if denominator <= 0:
-        return 0.0
-    return numerator / denominator
+# ============================================================================
+# STYLOMETRY
+# ============================================================================
 
-
-def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
-    return max(low, min(high, float(value)))
-
-
-# ---------------------------------------------------------------------------
-# Stylometry
-# ---------------------------------------------------------------------------
-
-def stylometry(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
+def stylometry(
+    posts: Iterable[dict[str, Any]],
+) -> dict[str, Any]:
     """
-    Extract conservative stylometric features from a collection of posts.
+    Extract descriptive stylometric features.
 
-    The output is descriptive. It does not claim that two profiles belong
-    to the same person.
+    This does NOT identify an author.
     """
+
     posts = list(posts or [])
 
-    texts = [_extract_text(post) for post in posts]
-    texts = [text for text in texts if text]
+    texts = [
+        _extract_text(post)
+        for post in posts
+    ]
+
+    texts = [
+        text
+        for text in texts
+        if text
+    ]
 
     if not texts:
         return asdict(
@@ -249,8 +305,16 @@ def stylometry(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
             )
         )
 
-    words_per_post = [tokenize(text) for text in texts]
-    words = [word for post_words in words_per_post for word in post_words]
+    words_per_post = [
+        tokenize(text)
+        for text in texts
+    ]
+
+    words = [
+        word
+        for post_words in words_per_post
+        for word in post_words
+    ]
 
     if not words:
         return asdict(
@@ -260,7 +324,10 @@ def stylometry(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
             )
         )
 
-    word_lengths = [len(word) for word in words]
+    word_lengths = [
+        len(word)
+        for word in words
+    ]
 
     sentence_lengths: list[int] = []
 
@@ -268,14 +335,24 @@ def stylometry(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
         sentences = _sentences(text)
 
         for sentence in sentences:
-            sentence_words = tokenize(sentence)
+            sentence_words = tokenize(
+                sentence
+            )
+
             if sentence_words:
-                sentence_lengths.append(len(sentence_words))
+                sentence_lengths.append(
+                    len(sentence_words)
+                )
 
     if not sentence_lengths:
-        sentence_lengths = [len(words)]
+        sentence_lengths = [
+            len(words)
+        ]
 
-    characters = sum(len(text) for text in texts)
+    characters = sum(
+        len(text)
+        for text in texts
+    )
 
     word_counter = Counter(words)
 
@@ -300,7 +377,8 @@ def stylometry(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
         1
         for text in texts
         for char in text
-        if char.isalpha() and char.isupper()
+        if char.isalpha()
+        and char.isupper()
     )
 
     alphabetic_count = sum(
@@ -328,37 +406,40 @@ def stylometry(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
     for text in texts:
         paragraphs = [
             paragraph.strip()
-            for paragraph in re.split(r"\n\s*\n", text)
+            for paragraph in re.split(
+                r"\n\s*\n",
+                text,
+            )
             if paragraph.strip()
         ]
 
         for paragraph in paragraphs:
-            paragraph_lengths.append(len(tokenize(paragraph)))
+            paragraph_lengths.append(
+                len(tokenize(paragraph))
+            )
 
     if not paragraph_lengths:
-        paragraph_lengths = [len(words)]
+        paragraph_lengths = [
+            len(words)
+        ]
 
     emoji_count = sum(
         1
         for text in texts
-        if any(
-            ord(char) > 0x1F000
-            for char in text
-        )
+        for char in text
+        if ord(char) > 0x1F000
     )
 
     url_count = sum(
         len(
-            re.findall(
-                r"https?://\S+|www\.\S+",
-                text,
-                flags=re.IGNORECASE,
-            )
+            URL_RE.findall(text)
         )
         for text in texts
     )
 
-    unique_words = len(word_counter)
+    unique_words = len(
+        word_counter
+    )
 
     hapax_words = sum(
         1
@@ -378,7 +459,9 @@ def stylometry(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
         ),
 
         word_length_stddev=round(
-            pstdev(word_lengths) if len(word_lengths) > 1 else 0.0,
+            pstdev(word_lengths)
+            if len(word_lengths) > 1
+            else 0.0,
             4,
         ),
 
@@ -395,42 +478,66 @@ def stylometry(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
         ),
 
         type_token_ratio=round(
-            _safe_ratio(unique_words, len(words)),
+            _safe_ratio(
+                unique_words,
+                len(words),
+            ),
             4,
         ),
 
         hapax_ratio=round(
-            _safe_ratio(hapax_words, unique_words),
+            _safe_ratio(
+                hapax_words,
+                unique_words,
+            ),
             4,
         ),
 
         punctuation_density=round(
-            _safe_ratio(punctuation_count, characters),
+            _safe_ratio(
+                punctuation_count,
+                characters,
+            ),
             6,
         ),
 
         exclamation_ratio=round(
-            _safe_ratio(exclamation_count, characters),
+            _safe_ratio(
+                exclamation_count,
+                characters,
+            ),
             6,
         ),
 
         question_ratio=round(
-            _safe_ratio(question_count, characters),
+            _safe_ratio(
+                question_count,
+                characters,
+            ),
             6,
         ),
 
         uppercase_ratio=round(
-            _safe_ratio(uppercase_count, alphabetic_count),
+            _safe_ratio(
+                uppercase_count,
+                alphabetic_count,
+            ),
             6,
         ),
 
         digit_ratio=round(
-            _safe_ratio(digit_count, characters),
+            _safe_ratio(
+                digit_count,
+                characters,
+            ),
             6,
         ),
 
         function_word_ratio=round(
-            _safe_ratio(function_words, len(words)),
+            _safe_ratio(
+                function_words,
+                len(words),
+            ),
             6,
         ),
 
@@ -446,17 +553,20 @@ def stylometry(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
     return asdict(profile)
 
 
-# ---------------------------------------------------------------------------
-# Behavioral analysis
-# ---------------------------------------------------------------------------
+# ============================================================================
+# BEHAVIORAL ANALYSIS
+# ============================================================================
 
-def behavior(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
+def behavior(
+    posts: Iterable[dict[str, Any]],
+) -> dict[str, Any]:
     """
     Extract observable posting behavior.
 
-    Behavioral features are descriptive and should not be treated as proof
-    of identity or intent.
+    These measurements describe activity patterns.
+    They do not establish identity or intent.
     """
+
     posts = list(posts or [])
 
     if not posts:
@@ -472,6 +582,7 @@ def behavior(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
 
     hours: list[int] = []
     weekdays: list[int] = []
+
     categories: Counter[str] = Counter()
     lengths: list[int] = []
 
@@ -479,7 +590,9 @@ def behavior(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
         text = _extract_text(post)
 
         if text:
-            lengths.append(len(tokenize(text)))
+            lengths.append(
+                len(tokenize(text))
+            )
 
         category = (
             post.get("category")
@@ -488,7 +601,9 @@ def behavior(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
         )
 
         if category:
-            categories[_safe_text(category)] += 1
+            categories[
+                _safe_text(category)
+            ] += 1
 
         timestamp = (
             post.get("timestamp_parsed")
@@ -498,27 +613,42 @@ def behavior(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
             or post.get("posted_at")
         )
 
-        parsed = _parse_timestamp(timestamp)
+        parsed = _parse_timestamp(
+            timestamp
+        )
 
         if parsed:
-            hours.append(parsed.hour)
-            weekdays.append(parsed.weekday())
+            hours.append(
+                parsed.hour
+            )
+
+            weekdays.append(
+                parsed.weekday()
+            )
 
     activity_concentration = 0.0
 
     if categories:
         activity_concentration = (
-            max(categories.values()) / len(posts)
+            max(categories.values())
+            / len(posts)
         )
 
     profile = BehavioralProfile(
         status="ok",
         posts=len(posts),
 
-        posting_hours=sorted(set(hours)),
-        posting_weekdays=sorted(set(weekdays)),
+        posting_hours=sorted(
+            set(hours)
+        ),
 
-        categories=dict(categories),
+        posting_weekdays=sorted(
+            set(weekdays)
+        ),
+
+        categories=dict(
+            categories
+        ),
 
         activity_concentration=round(
             activity_concentration,
@@ -526,7 +656,9 @@ def behavior(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
         ),
 
         avg_post_length=round(
-            mean(lengths) if lengths else 0.0,
+            mean(lengths)
+            if lengths
+            else 0.0,
             4,
         ),
 
@@ -537,82 +669,94 @@ def behavior(posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
             4,
         ),
 
-        active_hours=len(set(hours)),
-        active_days=len(set(weekdays)),
+        active_hours=len(
+            set(hours)
+        ),
+
+        active_days=len(
+            set(weekdays)
+        ),
     )
 
     return asdict(profile)
 
 
-# ---------------------------------------------------------------------------
-# Generic numeric similarity
-# ---------------------------------------------------------------------------
+# ============================================================================
+# NUMERIC SIMILARITY
+# ============================================================================
 
 def _relative_similarity(
     a: float,
     b: float,
     scale: Optional[float] = None,
 ) -> float:
-    """
-    Convert two numeric measurements into a bounded similarity value.
-
-    This is deliberately simple and interpretable.
-    """
     a = float(a)
     b = float(b)
 
     denominator = scale
 
     if denominator is None:
-        denominator = abs(a) + abs(b)
+        denominator = (
+            abs(a)
+            + abs(b)
+        )
 
     if denominator <= 1e-12:
         return 1.0
 
     return _clamp(
-        1.0 - abs(a - b) / denominator
+        1.0
+        - abs(a - b)
+        / denominator
     )
 
 
 def _distribution_similarity(
     a: Iterable[int],
     b: Iterable[int],
-    period: int,
 ) -> float:
-    """
-    Compare two sets of periodic activity points.
-
-    Example:
-    - hours → period 24
-    - weekdays → period 7
-    """
     a_set = set(a or [])
     b_set = set(b or [])
 
     if not a_set or not b_set:
         return 0.0
 
-    intersection = len(a_set & b_set)
-    union = len(a_set | b_set)
+    intersection = len(
+        a_set & b_set
+    )
 
-    return _safe_ratio(intersection, union)
+    union = len(
+        a_set | b_set
+    )
+
+    return _safe_ratio(
+        intersection,
+        union,
+    )
 
 
-# ---------------------------------------------------------------------------
-# Stylometric comparison
-# ---------------------------------------------------------------------------
+# ============================================================================
+# STYLOMETRIC COMPARISON
+# ============================================================================
 
 def compare(
     a: dict[str, Any],
     b: dict[str, Any],
 ) -> float:
     """
-    Backwards-compatible stylometric similarity function.
+    Backwards-compatible comparison API.
 
-    Returns a value from 0.0 to 1.0.
+    Returns a similarity value from 0.0 to 1.0.
     """
-    result = compare_stylometry(a, b)
-    return result["score"]
+
+    result = compare_stylometry(
+        a,
+        b,
+    )
+
+    return float(
+        result.get("score") or 0.0
+    )
 
 
 def compare_stylometry(
@@ -622,10 +766,10 @@ def compare_stylometry(
     """
     Compare two stylometric profiles.
 
-    Important:
-    This measures similarity of observed writing features only.
+    This measures similarity between observed writing features.
     It does not identify the author.
     """
+
     keys = (
         "avg_word_length",
         "word_length_stddev",
@@ -644,36 +788,51 @@ def compare_stylometry(
 
     similarities: dict[str, float] = {}
 
+    ratio_keys = {
+        "type_token_ratio",
+        "hapax_ratio",
+        "punctuation_density",
+        "exclamation_ratio",
+        "question_ratio",
+        "uppercase_ratio",
+        "digit_ratio",
+        "function_word_ratio",
+    }
+
     for key in keys:
         x = a.get(key)
         y = b.get(key)
 
-        if not isinstance(x, (int, float)):
+        if not isinstance(
+            x,
+            (int, float),
+        ):
             continue
 
-        if not isinstance(y, (int, float)):
+        if not isinstance(
+            y,
+            (int, float),
+        ):
             continue
 
         x = float(x)
         y = float(y)
 
-        if key in {
-            "type_token_ratio",
-            "hapax_ratio",
-            "punctuation_density",
-            "exclamation_ratio",
-            "question_ratio",
-            "uppercase_ratio",
-            "digit_ratio",
-            "function_word_ratio",
-        }:
+        if key in ratio_keys:
             similarity = _relative_similarity(
                 x,
                 y,
-                scale=max(abs(x), abs(y), 0.0001),
+                scale=max(
+                    abs(x),
+                    abs(y),
+                    0.0001,
+                ),
             )
         else:
-            similarity = _relative_similarity(x, y)
+            similarity = _relative_similarity(
+                x,
+                y,
+            )
 
         similarities[key] = round(
             similarity,
@@ -687,7 +846,9 @@ def compare_stylometry(
             "dimensions": {},
         }
 
-    score = mean(similarities.values())
+    score = mean(
+        similarities.values()
+    )
 
     return {
         "status": "ok",
@@ -699,9 +860,9 @@ def compare_stylometry(
     }
 
 
-# ---------------------------------------------------------------------------
-# Behavioral comparison
-# ---------------------------------------------------------------------------
+# ============================================================================
+# BEHAVIORAL COMPARISON
+# ============================================================================
 
 def compare_behavior(
     a: dict[str, Any],
@@ -711,59 +872,112 @@ def compare_behavior(
 
     dimensions["posting_hours"] = round(
         _distribution_similarity(
-            a.get("posting_hours", []),
-            b.get("posting_hours", []),
-            24,
+            a.get(
+                "posting_hours",
+                [],
+            ),
+            b.get(
+                "posting_hours",
+                [],
+            ),
         ),
         4,
     )
 
     dimensions["posting_weekdays"] = round(
         _distribution_similarity(
-            a.get("posting_weekdays", []),
-            b.get("posting_weekdays", []),
-            7,
+            a.get(
+                "posting_weekdays",
+                [],
+            ),
+            b.get(
+                "posting_weekdays",
+                [],
+            ),
         ),
         4,
     )
 
     if (
-        isinstance(a.get("avg_post_length"), (int, float))
-        and isinstance(b.get("avg_post_length"), (int, float))
+        isinstance(
+            a.get("avg_post_length"),
+            (int, float),
+        )
+        and isinstance(
+            b.get("avg_post_length"),
+            (int, float),
+        )
     ):
-        dimensions["avg_post_length"] = round(
+        dimensions[
+            "avg_post_length"
+        ] = round(
             _relative_similarity(
-                float(a["avg_post_length"]),
-                float(b["avg_post_length"]),
+                float(
+                    a["avg_post_length"]
+                ),
+                float(
+                    b["avg_post_length"]
+                ),
             ),
             4,
         )
 
     if (
-        isinstance(a.get("post_length_stddev"), (int, float))
-        and isinstance(b.get("post_length_stddev"), (int, float))
+        isinstance(
+            a.get("post_length_stddev"),
+            (int, float),
+        )
+        and isinstance(
+            b.get("post_length_stddev"),
+            (int, float),
+        )
     ):
-        dimensions["post_length_variability"] = round(
+        dimensions[
+            "post_length_variability"
+        ] = round(
             _relative_similarity(
-                float(a["post_length_stddev"]),
-                float(b["post_length_stddev"]),
+                float(
+                    a[
+                        "post_length_stddev"
+                    ]
+                ),
+                float(
+                    b[
+                        "post_length_stddev"
+                    ]
+                ),
             ),
             4,
         )
 
     categories_a = set(
-        (a.get("categories") or {}).keys()
+        (
+            a.get("categories")
+            or {}
+        ).keys()
     )
 
     categories_b = set(
-        (b.get("categories") or {}).keys()
+        (
+            b.get("categories")
+            or {}
+        ).keys()
     )
 
     if categories_a or categories_b:
-        union = categories_a | categories_b
-        intersection = categories_a & categories_b
+        union = (
+            categories_a
+            | categories_b
+        )
 
-        dimensions["categories"] = round(
+        intersection = (
+            categories_a
+            & categories_b
+        )
+
+        dimensions[
+            "categories"
+        ] = round(
             _safe_ratio(
                 len(intersection),
                 len(union),
@@ -778,7 +992,9 @@ def compare_behavior(
             "dimensions": {},
         }
 
-    score = mean(dimensions.values())
+    score = mean(
+        dimensions.values()
+    )
 
     return {
         "status": "ok",
@@ -790,9 +1006,99 @@ def compare_behavior(
     }
 
 
-# ---------------------------------------------------------------------------
-# Combined persona comparison
-# ---------------------------------------------------------------------------
+# ============================================================================
+# DATA QUALITY / CONFIDENCE
+# ============================================================================
+
+def _data_quality(
+    profile: dict[str, Any],
+) -> float:
+    """
+    Estimate comparison data quality.
+
+    This is NOT an identity probability.
+    """
+
+    style = (
+        profile.get("stylometry")
+        or {}
+    )
+
+    behavior_profile = (
+        profile.get("behavior")
+        or {}
+    )
+
+    style_words = int(
+        style.get("words")
+        or 0
+    )
+
+    style_posts = int(
+        style.get("posts")
+        or 0
+    )
+
+    behavior_posts = int(
+        behavior_profile.get("posts")
+        or 0
+    )
+
+    style_quality = _clamp(
+        math.log10(
+            max(
+                style_words,
+                1,
+            )
+        )
+        / 3.0
+    )
+
+    post_quality = _clamp(
+        style_posts / 20.0
+    )
+
+    behavior_quality = _clamp(
+        behavior_posts / 20.0
+    )
+
+    return _clamp(
+        style_quality * 0.55
+        + post_quality * 0.25
+        + behavior_quality * 0.20
+    )
+
+
+def calculate_analysis_confidence(
+    profile_a: dict[str, Any],
+    profile_b: dict[str, Any],
+) -> float:
+    """
+    Return the quality of the available comparison evidence.
+
+    This must not be interpreted as probability of common authorship.
+    """
+
+    quality_a = _data_quality(
+        profile_a
+    )
+
+    quality_b = _data_quality(
+        profile_b
+    )
+
+    return round(
+        min(
+            quality_a,
+            quality_b,
+        ),
+        4,
+    )
+
+
+# ============================================================================
+# COMBINED PERSONA COMPARISON
+# ============================================================================
 
 def compare_personas(
     profile_a: dict[str, Any],
@@ -801,19 +1107,39 @@ def compare_personas(
     behavior_weight: float = 0.30,
 ) -> dict[str, Any]:
     """
-    Produce an evidence-aware comparison between two observed profiles.
+    Compare two observed profiles.
 
-    Stylometry is weighted more heavily than behavior because behavioral
-    features are generally more contextual and easier to share between
-    unrelated users.
-
-    The resulting score is a similarity lead, NOT an identity probability.
+    The returned score is a similarity measurement.
+    It is not an identity probability.
     """
-    style_a = profile_a.get("stylometry") or {}
-    style_b = profile_b.get("stylometry") or {}
 
-    behavior_a = profile_a.get("behavior") or {}
-    behavior_b = profile_b.get("behavior") or {}
+    style_a = (
+        profile_a.get(
+            "stylometry"
+        )
+        or {}
+    )
+
+    style_b = (
+        profile_b.get(
+            "stylometry"
+        )
+        or {}
+    )
+
+    behavior_a = (
+        profile_a.get(
+            "behavior"
+        )
+        or {}
+    )
+
+    behavior_b = (
+        profile_b.get(
+            "behavior"
+        )
+        or {}
+    )
 
     style_result = compare_stylometry(
         style_a,
@@ -851,7 +1177,10 @@ def compare_personas(
             dimensions={},
             evidence=[],
             limitations=[
-                "Insufficient comparable stylometric or behavioral data.",
+                (
+                    "Insufficient comparable "
+                    "stylometric or behavioral data."
+                ),
             ],
         ).to_dict()
 
@@ -860,38 +1189,50 @@ def compare_personas(
         for _, weight in available_dimensions
     )
 
-    score = sum(
-        value * weight
-        for value, weight in available_dimensions
-    ) / total_weight
+    score = (
+        sum(
+            value * weight
+            for value, weight
+            in available_dimensions
+        )
+        / total_weight
+    )
 
     evidence: list[str] = []
     limitations: list[str] = []
 
     if style_result["status"] == "ok":
         evidence.append(
-            f"Stylometric similarity: "
-            f"{style_result['score']:.2f}"
+            (
+                "Stylometric similarity: "
+                f"{style_result['score']:.2f}"
+            )
         )
     else:
         limitations.append(
-            "Stylometric comparison could not be performed "
-            "with sufficient data."
+            (
+                "Stylometric comparison could "
+                "not be performed with "
+                "sufficient data."
+            )
         )
 
     if behavior_result["status"] == "ok":
         evidence.append(
-            f"Behavioral similarity: "
-            f"{behavior_result['score']:.2f}"
+            (
+                "Behavioral similarity: "
+                f"{behavior_result['score']:.2f}"
+            )
         )
     else:
         limitations.append(
-            "Behavioral comparison could not be performed "
-            "with sufficient data."
+            (
+                "Behavioral comparison could "
+                "not be performed with "
+                "sufficient data."
+            )
         )
 
-    # Confidence represents quality/support of the comparison,
-    # not probability that both profiles belong to the same person.
     confidence = calculate_analysis_confidence(
         profile_a,
         profile_b,
@@ -899,11 +1240,20 @@ def compare_personas(
 
     limitations.extend(
         [
-            "Similarity does not establish identity.",
-            "Shared writing style or activity patterns may occur "
-            "between unrelated users.",
-            "Attribution should require corroborating identifiers "
-            "and independent evidence.",
+            (
+                "Similarity does not establish "
+                "identity."
+            ),
+            (
+                "Shared writing style or activity "
+                "patterns may occur between "
+                "unrelated users."
+            ),
+            (
+                "Attribution should require "
+                "corroborating identifiers and "
+                "independent evidence."
+            ),
         ]
     )
 
@@ -932,114 +1282,81 @@ def compare_personas(
     ).to_dict()
 
 
-# ---------------------------------------------------------------------------
-# Confidence
-# ---------------------------------------------------------------------------
-
-def _data_quality(
-    profile: dict[str, Any],
-) -> float:
-    """
-    Estimate whether a profile has enough observations for comparison.
-
-    This is a data-quality measure, not an attribution probability.
-    """
-    style = profile.get("stylometry") or {}
-    behavior_profile = profile.get("behavior") or {}
-
-    style_words = int(
-        style.get("words") or 0
-    )
-
-    style_posts = int(
-        style.get("posts") or 0
-    )
-
-    behavior_posts = int(
-        behavior_profile.get("posts") or 0
-    )
-
-    style_quality = _clamp(
-        math.log10(max(style_words, 1)) / 3.0
-    )
-
-    post_quality = _clamp(
-        style_posts / 20.0
-    )
-
-    behavior_quality = _clamp(
-        behavior_posts / 20.0
-    )
-
-    return _clamp(
-        (
-            style_quality * 0.55
-            + post_quality * 0.25
-            + behavior_quality * 0.20
-        )
-    )
-
-
-def calculate_analysis_confidence(
-    profile_a: dict[str, Any],
-    profile_b: dict[str, Any],
-) -> float:
-    quality_a = _data_quality(profile_a)
-    quality_b = _data_quality(profile_b)
-
-    return round(
-        min(quality_a, quality_b),
-        4,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Complete analysis
-# ---------------------------------------------------------------------------
+# ============================================================================
+# COMPLETE ANALYSIS
+# ============================================================================
 
 def analyze_posts(
     posts: Iterable[dict[str, Any]],
 ) -> dict[str, Any]:
     """
-    Generate the complete analysis profile for one observed account/source.
+    Generate the complete analysis profile
+    for one observed account/source.
     """
+
     posts = list(posts or [])
 
-    style = stylometry(posts)
-    behavior_profile = behavior(posts)
+    style = stylometry(
+        posts
+    )
+
+    behavior_profile = behavior(
+        posts
+    )
+
+    status = (
+        "ok"
+        if (
+            style.get("status")
+            == "ok"
+            or behavior_profile.get(
+                "status"
+            )
+            == "ok"
+        )
+        else "insufficient_data"
+    )
 
     return {
-        "status": (
-            "ok"
-            if (
-                style.get("status") == "ok"
-                or behavior_profile.get("status") == "ok"
-            )
-            else "insufficient_data"
-        ),
+        "status": status,
         "stylometry": style,
         "behavior": behavior_profile,
         "analysis_version": "2.0",
     }
 
 
-# ---------------------------------------------------------------------------
-# Multi-profile comparison
-# ---------------------------------------------------------------------------
+def analyze(
+    posts: Iterable[dict[str, Any]],
+) -> dict[str, Any]:
+    """
+    Backwards-compatible alias.
+    """
+
+    return analyze_posts(
+        posts
+    )
+
+
+# ============================================================================
+# MULTI-PROFILE COMPARISON
+# ============================================================================
 
 def compare_multiple_profiles(
     reference_profile: dict[str, Any],
-    candidate_profiles: Iterable[dict[str, Any]],
+    candidate_profiles: Iterable[
+        dict[str, Any]
+    ],
 ) -> list[dict[str, Any]]:
     """
-    Compare one reference profile against multiple candidate profiles.
+    Compare one reference profile against
+    multiple candidate profiles.
 
-    Results are sorted by similarity for investigation convenience.
-
-    This is an ordering of similarity measurements, not an attribution
-    ranking or identity conclusion.
+    Results are ordered by measured similarity.
     """
-    results: list[dict[str, Any]] = []
+
+    results: list[
+        dict[str, Any]
+    ] = []
 
     for candidate in candidate_profiles:
         result = compare_personas(
@@ -1053,11 +1370,14 @@ def compare_multiple_profiles(
             or candidate.get("id")
         )
 
-        results.append(result)
+        results.append(
+            result
+        )
 
     results.sort(
-        key=lambda item: (
-            float(item.get("score") or 0.0)
+        key=lambda item: float(
+            item.get("score")
+            or 0.0
         ),
         reverse=True,
     )
@@ -1065,9 +1385,9 @@ def compare_multiple_profiles(
     return results
 
 
-# ---------------------------------------------------------------------------
-# Database persistence
-# ---------------------------------------------------------------------------
+# ============================================================================
+# DATABASE PERSISTENCE
+# ============================================================================
 
 def persist_analysis(
     db: Any,
@@ -1077,22 +1397,32 @@ def persist_analysis(
     run_id: Optional[str] = None,
 ) -> dict[str, Any]:
     """
-    Persist analysis observations through the PRALAYX database layer.
+    Persist the analysis result through the
+    PRALAYX database layer.
 
-    The analysis result itself is preserved as a raw snapshot so the exact
-    generated result can be inspected later without overwriting previous runs.
+    The complete analysis result is preserved
+    as a raw snapshot so later runs do not
+    overwrite previous analysis.
     """
+
     posts = list(posts or [])
 
-    result = analyze_posts(posts)
+    result = analyze_posts(
+        posts
+    )
 
     if db is None:
         return result
 
     metadata = {
-        "analysis_version": result["analysis_version"],
+        "analysis_version":
+            result["analysis_version"],
         "posts": len(posts),
     }
+
+    # ------------------------------------------------------------------
+    # Preserve the complete generated result.
+    # ------------------------------------------------------------------
 
     try:
         db.add_raw_snapshot(
@@ -1102,8 +1432,8 @@ def persist_analysis(
             session_id=None,
             run_id=run_id,
         )
+
     except TypeError:
-        # Compatibility with older database wrappers.
         try:
             db.add_raw_snapshot(
                 investigation_id,
@@ -1113,19 +1443,32 @@ def persist_analysis(
             )
         except Exception:
             pass
+
     except Exception:
         pass
 
-    style = result.get("stylometry") or {}
-    behavior_profile = result.get("behavior") or {}
+    # ------------------------------------------------------------------
+    # Persist descriptive observations.
+    # ------------------------------------------------------------------
 
-    # Persist high-value observable features as entity sightings.
+    style = (
+        result.get("stylometry")
+        or {}
+    )
+
+    behavior_profile = (
+        result.get("behavior")
+        or {}
+    )
+
     try:
         if style.get("status") == "ok":
             db.add_observation(
                 investigation_id=investigation_id,
                 entity_type="stylometry_profile",
-                entity_value=f"{style.get('words', 0)}_words",
+                entity_value=(
+                    f"{style.get('words', 0)}_words"
+                ),
                 actor_id=actor_id,
                 confidence=None,
                 metadata={
@@ -1138,11 +1481,15 @@ def persist_analysis(
         pass
 
     try:
-        if behavior_profile.get("status") == "ok":
+        if behavior_profile.get(
+            "status"
+        ) == "ok":
             db.add_observation(
                 investigation_id=investigation_id,
                 entity_type="behavior_profile",
-                entity_value=f"{behavior_profile.get('posts', 0)}_posts",
+                entity_value=(
+                    f"{behavior_profile.get('posts', 0)}_posts"
+                ),
                 actor_id=actor_id,
                 confidence=None,
                 metadata={
@@ -1154,47 +1501,48 @@ def persist_analysis(
     except Exception:
         pass
 
+    # ------------------------------------------------------------------
+    # Timeline event.
+    # ------------------------------------------------------------------
+
     try:
         db.add_timeline_event(
             investigation_id=investigation_id,
             event_type="analysis_completed",
             message=(
-                "Stylometry and behavioral analysis completed"
+                "Stylometry and behavioral "
+                "analysis completed"
             ),
             run_id=run_id,
             actor_id=actor_id,
             metadata=result,
         )
+
     except TypeError:
         try:
             db.add_timeline_event(
                 investigation_id,
                 "analysis_completed",
-                "Stylometry and behavioral analysis completed",
+                (
+                    "Stylometry and behavioral "
+                    "analysis completed"
+                ),
                 run_id=run_id,
                 actor_id=actor_id,
                 metadata=result,
             )
         except Exception:
             pass
+
     except Exception:
         pass
 
     return result
 
 
-# ---------------------------------------------------------------------------
-# Legacy compatibility
-# ---------------------------------------------------------------------------
-
-def analyze(
-    posts: Iterable[dict[str, Any]],
-) -> dict[str, Any]:
-    """
-    Backwards-compatible alias used by older platform code.
-    """
-    return analyze_posts(posts)
-
+# ============================================================================
+# PUBLIC API
+# ============================================================================
 
 __all__ = [
     "StylometricProfile",
