@@ -1,27 +1,5 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PRALAYX — Threat Intelligence</title>
-<link rel="stylesheet" href="/web/app.css">
-</head>
-<body>
-<div class="app-shell">
-<aside class="sidebar"></aside>
-<main class="main">
-<header class="topbar"><div><span class="eyebrow">INVESTIGATOR CONSOLE</span><h1>Dashboard</h1></div><span id="api-status" class="status-pill">API checking...</span></header>
-<section class="hero card">
-<div><span class="eyebrow">NEW INVESTIGATION</span><h2>Start from a dark-web target</h2><p>Launch a crawler session and keep the same investigation context through OSINT, analysis, correlation and reporting.</p></div>
-<form id="crawl-form" class="crawl-form"><input id="crawl-url" type="url" placeholder="http://example.onion/..." required><input id="crawl-username" type="text" placeholder="Optional actor / username"><button type="submit">Start Crawl</button></form>
-</section>
-<section class="stats-grid">
-<div class="stat card"><span>Investigations</span><strong id="stat-investigations">—</strong></div>
-<div class="stat card"><span>Tracked actors</span><strong id="stat-actors">—</strong></div>
-<div class="stat card"><span>Open alerts</span><strong id="stat-alerts">—</strong></div>
-<div class="stat card"><span>Recent reports</span><strong id="stat-reports">—</strong></div>
-</section>
-<section class="card"><div class="section-head"><div><span class="eyebrow">RECENT</span><h2>Investigations</h2></div><a href="/web/investigations.html" class="text-link">View all</a></div><div id="recent-investigations" class="list"><div class="muted">Loading…</div></div></section>
-<section id="live-session" class="card hidden"></section>
-</main></div>
-<script src="/web/app.js"></script>
-</body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRALAYX</title><link rel="stylesheet" href="/web/app.css"></head><body><div class="app"><aside class="sidebar"></aside><main class="main"><header class="top"><div><span class="kicker">INVESTIGATOR CONSOLE / OPERATIONS</span><h1>Dashboard</h1></div><span id="api-status" class="case-chip">API CHECKING</span></header>
+<section class="panel panel-pad hero"><div><span class="kicker">NEW INVESTIGATION</span><h2>Collect evidence from a target</h2><p>Start a crawler investigation. The same investigation ID follows the evidence through OSINT, persona analysis, correlation, monitoring and report generation.</p></div><form id="crawl-form" class="form"><input class="input" id="crawl-url" type="url" placeholder="http://example.onion/..." required><input class="input" id="crawl-username" placeholder="Actor / username"><button class="btn">Start Crawl</button></form></section>
+<section class="grid g4 section"><div class="panel metric"><label>Investigations</label><strong id="stat-investigations">—</strong></div><div class="panel metric"><label>Tracked actors</label><strong id="stat-actors">—</strong></div><div class="panel metric"><label>Open alerts</label><strong id="stat-alerts">—</strong></div><div class="panel metric"><label>Report artifacts</label><strong id="stat-reports">—</strong></div></section>
+<section class="panel section"><div class="section-title panel-pad"><h2>Recent investigations</h2><a class="source" href="/web/investigations.html">View all →</a></div><div id="recent-investigations"></div></section>
+<section id="live-session" class="panel panel-pad section hidden"></section></main></div><script src="/web/app.js"></script></body></html>
