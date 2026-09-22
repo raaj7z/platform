@@ -19,6 +19,7 @@ from fastapi.responses import (
     HTMLResponse,
     Response,
 )
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .analysis import (
@@ -132,6 +133,11 @@ app = FastAPI(
     ),
     version="2.0.0",
     lifespan=lifespan,
+)
+app.mount(
+    "/web",
+    StaticFiles(directory=WEB_PATH),
+    name="web",
 )
 
 
