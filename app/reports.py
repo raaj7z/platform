@@ -323,90 +323,9 @@ def build_report(
             "html",
         )
 
-    if fmt == "pdf":
-        return (
-            pdf_bytes(
-                title,
-                data,
-            ),
-            "application/pdf",
-            "pdf",
-        )
-
     raise ValueError(
         f"Unsupported report format: {fmt}"
     )
-
-
-def pdf_bytes(
-    title: str,
-    data: Any,
-) -> bytes:
-    """
-    Generate a formatted PDF report using ReportLab.
-    """
-    from datetime import datetime, timezone
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-    from reportlab.platypus import Paragraph, Preformatted, SimpleDocTemplate, Spacer
-
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=36,
-        leftMargin=36,
-        topMargin=36,
-        bottomMargin=36,
-    )
-
-    styles = getSampleStyleSheet()
-    story = []
-
-    title_style = ParagraphStyle(
-        "ReportTitle",
-        parent=styles["Heading1"],
-        fontSize=18,
-        leading=22,
-        textColor=colors.HexColor("#0f172a"),
-    )
-
-    story.append(
-        Paragraph(
-            f"<b>{html.escape(str(title))}</b>",
-            title_style,
-        )
-    )
-
-    story.append(
-        Paragraph(
-            f"PRALAYX Threat Actor De-anonymization Report | Generated at {datetime.now(timezone.utc).isoformat()}",
-            styles["Normal"],
-        )
-    )
-
-    story.append(Spacer(1, 14))
-
-    serialized = json.dumps(
-        data,
-        indent=2,
-        ensure_ascii=False,
-        default=_json_default,
-    )
-
-    if len(serialized) > 5000:
-        serialized = serialized[:5000] + "\n\n... [truncated for PDF summary export]"
-
-    story.append(
-        Preformatted(
-            serialized,
-            styles["Code"],
-        )
-    )
-
-    doc.build(story)
-    return buffer.getvalue()
 
 
 # ---------------------------------------------------------------------------

@@ -532,22 +532,6 @@ def _import_actor_row(
         metadata=row,
     )
 
-    try:
-        db.add_relationship(
-            investigation_id=investigation_id,
-            from_type="actor" if actor_id else "investigation",
-            from_value=actor_id or investigation_id,
-            relationship_type=f"has_{finding_type}",
-            to_type=str(finding_type),
-            to_value=value,
-            confidence=confidence,
-            source=str(source),
-            source_url=_safe_text(source_url),
-            run_id=run_id,
-        )
-    except Exception:
-        pass
-
     return finding_id
 
 
@@ -640,22 +624,6 @@ def _import_network_row(
         confidence=confidence,
         metadata=row,
     )
-
-    try:
-        db.add_relationship(
-            investigation_id=investigation_id,
-            from_type="actor" if actor_id else "investigation",
-            from_value=actor_id or investigation_id,
-            relationship_type=f"has_{finding_type}",
-            to_type=str(finding_type),
-            to_value=value,
-            confidence=confidence,
-            source=str(source),
-            source_url=_safe_text(source_url),
-            run_id=run_id,
-        )
-    except Exception:
-        pass
 
     return finding_id
 
@@ -790,67 +758,45 @@ def run(
         _status(
             db,
             job_id,
-            "Checking Tor connectivity (127.0.0.1:9050)...",
+            "Checking Tor connectivity...",
             0.07,
             run_id=run_id,
         )
 
-        import socket
-        import subprocess
         tor_ok = False
         tor_message = ""
 
-        # First check if 9050/9150 is active
-        for port in (9050, 9150):
-            try:
-                with socket.create_connection(("127.0.0.1", port), timeout=3.0):
-                    tor_ok = True
-                    tor_message = f"Tor SOCKS proxy responsive on 127.0.0.1:{port}"
-                    break
-            except Exception:
-                continue
+        try:
+            if hasattr(
+                crawler_module,
+                "check_tor",
+            ):
+                tor_ok, tor_message = (
+                    crawler_module.check_tor()
+                )
+            else:
+                tor_ok = True
+                tor_message = (
+                    "Crawler service does not expose "
+                    "a dedicated Tor check."
+                )
+        except Exception as exc:
+            tor_ok = False
+            tor_message = str(exc)
 
         if not tor_ok:
-            # Auto-launch Tor via WSL bridge
-            try:
-                _status(db, job_id, "Tor offline. Auto-starting Tor service & bridge...", 0.08, run_id=run_id)
-                subprocess.run(["wsl", "sudo", "service", "tor", "start"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
-                from app import tor_bridge
-                tor_bridge.ensure_tor_started()
-                bridge_script = os.path.join(os.path.dirname(__file__), "tor_bridge.py")
-                subprocess.Popen([sys.executable, bridge_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                import time
-                time.sleep(2)
-                with socket.create_connection(("127.0.0.1", 9050), timeout=3.0):
-                    tor_ok = True
-                    tor_message = "Tor service & SOCKS bridge auto-started on 127.0.0.1:9050"
-            except Exception as exc:
-                tor_message = str(exc)
-
-        if not tor_ok:
-            try:
-                if hasattr(crawler_module, "check_tor"):
-                    tor_ok, tor_message = crawler_module.check_tor()
-            except Exception as exc:
-                tor_message = str(exc)
-
-        if tor_ok:
-            _status(
-                db,
-                job_id,
-                f"Tor connectivity OK: {tor_message}",
-                0.10,
-                run_id=run_id,
+            raise RuntimeError(
+                f"Tor connectivity check failed: "
+                f"{tor_message}"
             )
-        else:
-            _event(
-                db,
-                job_id,
-                "warn",
-                f"Tor SOCKS proxy offline (127.0.0.1:9050). If target is a .onion service, ensure Tor is running ('sudo service tor start' or 'tor').",
-                0.10,
-                run_id=run_id,
-            )
+
+        _status(
+            db,
+            job_id,
+            f"Tor connectivity OK: {tor_message}",
+            0.10,
+            run_id=run_id,
+        )
 
         # ----------------------------------------------------
         # Run the actual crawler.
@@ -1133,24 +1079,6 @@ def run(
             investigation_id,
             status="completed",
         )
-
-        try:
-            from .config import REPORTS_PATH
-            from .reports import generate_investigation_reports
-            full_rep = db.get_investigation(investigation_id)
-            if full_rep:
-                generate_investigation_reports(
-                    db,
-                    full_rep,
-                    investigation_id=investigation_id,
-                    output_dir=REPORTS_PATH,
-                    run_id=run_id,
-                    session_id=session_id,
-                    module_id="darkweb-crawler",
-                )
-                _event(db, job_id, "report", "Generated downloadable PDF, HTML, JSON, and CSV reports", 0.98, run_id=run_id)
-        except Exception as report_err:
-            _event(db, job_id, "warning", f"Report generation notice: {report_err}", 0.98, run_id=run_id)
 
         db.add_timeline_event(
             investigation_id=investigation_id,
