@@ -1,1 +1,153 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRALAYX</title><link rel="stylesheet" href="/web/app.css"></head><body><div class="app"><aside class="sidebar"></aside><main class="main"><header class="top"><div><span class="kicker">SYSTEM CONFIGURATION</span><h1>Settings</h1></div></header><section class="grid g3"><div class="panel panel-pad"><span class="kicker">EXECUTION</span><h3>Crawler / OSINT</h3><p class="muted">Module paths and execution timeouts are controlled by environment configuration.</p></div><div class="panel panel-pad"><span class="kicker">PROVIDERS</span><h3>API credentials</h3><p class="muted">Provider keys are configured outside the UI and missing configuration is reported truthfully.</p></div><div class="panel panel-pad"><span class="kicker">STORAGE</span><h3>Evidence retention</h3><p class="muted">Investigation data, raw snapshots, findings, terminal events and report artifacts are retained.</p></div></section></main></div><script src="/web/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PRALAYX -- System Configuration & Settings</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo-mark">◒</div>
+        <div>
+          <div class="logo-name">PRALAY<em>X</em></div>
+          <span class="logo-sub">Dark Web Threat De-anonymization</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <div class="nav-title">OPERATIONS</div>
+        <a data-page="dashboard" href="/web/index.html"><span class="nav-ico">⌂</span>Dashboard Overview</a>
+        <a data-page="crawl" href="/web/crawl.html"><span class="nav-ico">＋</span>New Crawl</a>
+        <a data-page="investigations" href="/web/investigations.html"><span class="nav-ico">⌕</span>Investigations Workspace</a>
+        <div class="nav-title">INTELLIGENCE</div>
+        <a data-page="correlation" href="/web/correlation.html"><span class="nav-ico">⌘</span>Relationship Graph</a>
+        <a data-page="osint" href="/web/osint.html"><span class="nav-ico">◎</span>OSINT & Misconfigurations</a>
+        <a data-page="analysis" href="/web/analysis.html"><span class="nav-ico">⌁</span>AI Stylometry / Persona</a>
+        <a data-page="reports" href="/web/reports.html"><span class="nav-ico">▤</span>Final Reports & Export</a>
+        <div class="nav-title">MONITORING</div>
+        <a data-page="monitoring" href="/web/monitoring.html"><span class="nav-ico">◉</span>Watchlist & Alerts</a>
+        <div class="nav-title">SYSTEM</div>
+        <a data-page="terminal" href="/web/terminal.html"><span class="nav-ico">›_</span>Terminal Log</a>
+        <a data-page="settings" href="/web/settings.html"><span class="nav-ico">⚙</span>Settings</a>
+      </nav>
+      <div class="sidebar-foot">
+        <button id="btn-toggle-theme" type="button" class="btn ghost" style="width:100%;margin-bottom:10px;font-size:11px;height:32px;display:flex;align-items:center;justify-content:center;gap:6px">☀️ Day Mode</button>
+        <div>PRALAYX v2.0 (SIH26151)<br>EVIDENCE · ENTITY · ATTRIBUTION</div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="top">
+        <div>
+          <span class="kicker">SYSTEM CONFIGURATION & MAINTENANCE</span>
+          <h1>System Settings</h1>
+        </div>
+        <span id="settings-status-badge" class="case-chip">ONLINE</span>
+      </header>
+
+      <div class="grid g2 section">
+        <!-- 1. Tor Proxy & Network Configuration -->
+        <section class="panel panel-pad">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div>
+              <span class="kicker">DARK WEB ROUTING</span>
+              <h3 style="margin:2px 0 0 0;color:#38bdf8">Tor SOCKS Proxy & Network Settings</h3>
+            </div>
+            <span id="tor-live-status" class="tag green">CHECKING TOR...</span>
+          </div>
+
+          <form id="tor-settings-form" style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <label style="font-size:12px;font-weight:700;color:#cbd5e1;display:block;margin-bottom:4px">Tor SOCKS Proxy Host</label>
+              <input id="setting-tor-host" class="input" value="127.0.0.1" placeholder="127.0.0.1">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:700;color:#cbd5e1;display:block;margin-bottom:4px">Tor SOCKS Proxy Port</label>
+              <input id="setting-tor-port" class="input" type="number" value="9050" placeholder="9050">
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <input type="checkbox" id="setting-require-tor" checked style="width:16px;height:16px">
+              <label for="setting-require-tor" style="font-size:12px;color:#cbd5e1">Require active Tor proxy for .onion hidden service crawls</label>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:8px">
+              <button id="btn-test-tor" type="button" class="btn" style="font-size:12px">🔌 Test Tor Connection</button>
+              <button type="submit" class="btn green" style="font-size:12px">💾 Save Proxy Settings</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- 2. OSINT API Credentials -->
+        <section class="panel panel-pad">
+          <div style="margin-bottom:14px">
+            <span class="kicker">EXTERNAL PROVIDERS</span>
+            <h3 style="margin:2px 0 0 0;color:#c084fc">OSINT API Credentials</h3>
+          </div>
+
+          <form id="api-keys-form" style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <label style="font-size:12px;font-weight:700;color:#cbd5e1;display:block;margin-bottom:4px">Shodan API Key</label>
+              <input id="setting-shodan-key" class="input" type="password" placeholder="Enter Shodan API Key...">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:700;color:#cbd5e1;display:block;margin-bottom:4px">VirusTotal API Key</label>
+              <input id="setting-vt-key" class="input" type="password" placeholder="Enter VirusTotal API Key...">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:700;color:#cbd5e1;display:block;margin-bottom:4px">AlienVault OTX Key</label>
+              <input id="setting-alienvault-key" class="input" type="password" placeholder="Enter AlienVault OTX Key...">
+            </div>
+            <div style="margin-top:8px">
+              <button type="submit" class="btn purple" style="font-size:12px">🔑 Update API Credentials</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- 3. Crawler Concurrency & Timeout -->
+        <section class="panel panel-pad">
+          <div style="margin-bottom:14px">
+            <span class="kicker">EXECUTION OPTIMIZATION</span>
+            <h3 style="margin:2px 0 0 0;color:#f59e0b">Crawler & Scanner Tuning</h3>
+          </div>
+
+          <form id="tuning-form" style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <label style="font-size:12px;font-weight:700;color:#cbd5e1;display:block;margin-bottom:4px">Default Crawler Worker Threads (1 - 10)</label>
+              <input id="setting-workers" class="input" type="number" min="1" max="10" value="3">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:700;color:#cbd5e1;display:block;margin-bottom:4px">Crawl Timeout (seconds)</label>
+              <input id="setting-timeout" class="input" type="number" min="30" max="600" value="120">
+            </div>
+            <div style="margin-top:8px">
+              <button type="submit" class="btn amber" style="font-size:12px">⚡ Save Execution Tuning</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- 4. Database Maintenance -->
+        <section class="panel panel-pad">
+          <div style="margin-bottom:14px">
+            <span class="kicker">STORAGE & HEALTH</span>
+            <h3 style="margin:2px 0 0 0;color:#10b981">SQLite Database Maintenance</h3>
+          </div>
+
+          <div style="font-size:12px;color:#cbd5e1;background:#091326;padding:12px;border-radius:6px;border:1px solid #1e3660;margin-bottom:14px">
+            <div>Database File: <strong id="db-path-text" style="color:#38bdf8">C:\...\pralayx.db</strong></div>
+            <div>Database Size: <strong id="db-size-text" style="color:#10b981">0 KB</strong></div>
+            <div>Status: <strong>WAL Mode Active (PRAGMA foreign_keys = ON)</strong></div>
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button id="btn-vacuum-db" type="button" class="btn green" style="font-size:12px">⚡ Vacuum & Reclaim Disk Space</button>
+            <button id="btn-clear-history" type="button" class="btn danger" style="font-size:12px">🗑️ Clear Search & Crawl History</button>
+          </div>
+        </section>
+      </div>
+
+      <div id="settings-toast" class="notice hidden" style="margin-top:16px"></div>
+    </main>
+  </div>
+  <script src="/web/app.js"></script>
+</body>
+</html>

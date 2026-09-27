@@ -1,5 +1,140 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRALAYX</title><link rel="stylesheet" href="/web/app.css"></head><body><div class="app"><aside class="sidebar"></aside><main class="main"><header class="top"><div><span class="kicker">INVESTIGATOR CONSOLE / OPERATIONS</span><h1>Dashboard</h1></div><span id="api-status" class="case-chip">API CHECKING</span></header>
-<section class="panel panel-pad hero"><div><span class="kicker">NEW INVESTIGATION</span><h2>Collect evidence from a target</h2><p>Start a crawler investigation. The same investigation ID follows the evidence through OSINT, persona analysis, correlation, monitoring and report generation.</p></div><form id="crawl-form" class="form"><input class="input" id="crawl-url" type="url" placeholder="http://example.onion/..." required><input class="input" id="crawl-username" placeholder="Actor / username"><button class="btn">Start Crawl</button></form></section>
-<section class="grid g4 section"><div class="panel metric"><label>Investigations</label><strong id="stat-investigations">—</strong></div><div class="panel metric"><label>Tracked actors</label><strong id="stat-actors">—</strong></div><div class="panel metric"><label>Open alerts</label><strong id="stat-alerts">—</strong></div><div class="panel metric"><label>Report artifacts</label><strong id="stat-reports">—</strong></div></section>
-<section class="panel section"><div class="section-title panel-pad"><h2>Recent investigations</h2><a class="source" href="/web/investigations.html">View all →</a></div><div id="recent-investigations"></div></section>
-<section id="live-session" class="panel panel-pad section hidden"></section></main></div><script src="/web/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PRALAYX -- Dashboard Overview</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo-mark">◒</div>
+        <div>
+          <div class="logo-name">PRALAY<em>X</em></div>
+          <span class="logo-sub">Dark Web Threat De-anonymization</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <div class="nav-title">OPERATIONS</div>
+        <a data-page="dashboard" href="/web/index.html"><span class="nav-ico">⌂</span>Dashboard Overview</a>
+        <a data-page="crawl" href="/web/crawl.html"><span class="nav-ico">＋</span>New Crawl</a>
+        <a data-page="investigations" href="/web/investigations.html"><span class="nav-ico">⌕</span>Investigations Workspace</a>
+        <div class="nav-title">INTELLIGENCE</div>
+        <a data-page="correlation" href="/web/correlation.html"><span class="nav-ico">⌘</span>Relationship Graph</a>
+        <a data-page="osint" href="/web/osint.html"><span class="nav-ico">◎</span>OSINT & Misconfigurations</a>
+        <a data-page="analysis" href="/web/analysis.html"><span class="nav-ico">⌁</span>AI Stylometry / Persona</a>
+        <a data-page="reports" href="/web/reports.html"><span class="nav-ico">▤</span>Final Reports & Export</a>
+        <div class="nav-title">MONITORING</div>
+        <a data-page="monitoring" href="/web/monitoring.html"><span class="nav-ico">◉</span>Watchlist & Alerts</a>
+        <div class="nav-title">SYSTEM</div>
+        <a data-page="terminal" href="/web/terminal.html"><span class="nav-ico">›_</span>Terminal Log</a>
+        <a data-page="settings" href="/web/settings.html"><span class="nav-ico">⚙</span>Settings</a>
+      </nav>
+      <div class="sidebar-foot">
+        <button id="btn-toggle-theme" type="button" class="btn ghost" style="width:100%;margin-bottom:10px;font-size:11px;height:32px;display:flex;align-items:center;justify-content:center;gap:6px">☀️ Day Mode</button>
+        <div>PRALAYX v2.0 (SIH26151)<br>EVIDENCE · ENTITY · ATTRIBUTION</div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="top">
+        <div>
+          <span class="kicker">OPERATIONS / OVERVIEW</span>
+          <h1>Dashboard Overview</h1>
+        </div>
+        <span id="api-status" class="case-chip">API CHECKING</span>
+      </header>
+
+      <!-- Quick Investigation Launch -->
+      <section class="panel panel-pad hero section" style="background:linear-gradient(135deg, #0f172a, #1e293b);margin-bottom:16px">
+        <div>
+          <span class="kicker" style="color:#38bdf8">NEW TARGET CRAWL</span>
+          <h2>Collect Footprints from Hidden Service Target</h2>
+          <p>Start dark web crawl. The Investigation ID automatically propagates evidence to OSINT, Stylometry, Correlation, and Final Reports.</p>
+        </div>
+        <form id="crawl-form" class="form">
+          <input class="input" id="crawl-url" type="url" placeholder="http://darkmarket-v2.onion/..." required>
+          <input class="input" id="crawl-username" placeholder="Target Handle / Alias">
+          <button class="btn">+ Start Investigation</button>
+        </form>
+      </section>
+
+      <!-- 4 Top Metric Cards -->
+      <section class="grid g4 section" style="margin-bottom:16px">
+        <div class="panel metric">
+          <label>Active Investigations</label>
+          <strong id="stat-investigations">1</strong>
+          <small style="color:#38bdf8">Canonical Target Active</small>
+        </div>
+        <div class="panel metric">
+          <label>Awaiting Review</label>
+          <strong style="color:#f59e0b">3</strong>
+          <small style="color:#f59e0b">Findings Need Review</small>
+        </div>
+        <div class="panel metric">
+          <label>New Alerts</label>
+          <strong style="color:#ef4444">1</strong>
+          <small style="color:#ef4444">High Exposure Alert</small>
+        </div>
+        <div class="panel metric">
+          <label>Reports Ready</label>
+          <strong style="color:#10b981">4</strong>
+          <small style="color:#10b981">PDF, HTML, JSON, CSV</small>
+        </div>
+      </section>
+
+      <!-- Recent Investigations Table & Activity Split Grid -->
+      <div class="grid g2 section">
+        <section class="panel">
+          <div class="section-title panel-pad">
+            <h2>Recent Investigations</h2>
+            <a class="source" href="/web/investigations.html">View all →</a>
+          </div>
+          <div id="recent-investigations"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title panel-pad">
+            <h2>Recent Activity Stream</h2>
+            <span class="kicker">SYSTEM LOG</span>
+          </div>
+          <div id="recent-activity" class="panel-pad" style="font-size:11px;color:#cbd5e1">
+            <div style="padding:8px 0;border-bottom:1px solid #1e293b;display:flex;gap:10px;align-items:center">
+              <span class="tag green">NEW FINDING</span>
+              <div>
+                <strong>Exposed /server-status page detected</strong>
+                <div style="font-size:9px;color:#94a3b8">Target: http://darkmarket-v2.onion · 10m ago</div>
+              </div>
+            </div>
+            <div style="padding:8px 0;border-bottom:1px solid #1e293b;display:flex;gap:10px;align-items:center">
+              <span class="tag purple" style="border-color:#8b5cf6;color:#c084fc">CORRELATION</span>
+              <div>
+                <strong>Relationship Graph updated with 6 edges</strong>
+                <div style="font-size:9px;color:#94a3b8">Investigation: INV-DEMO-2026 · 25m ago</div>
+              </div>
+            </div>
+            <div style="padding:8px 0;border-bottom:1px solid #1e293b;display:flex;gap:10px;align-items:center">
+              <span class="tag red">ALERT TRIGGERED</span>
+              <div>
+                <strong>High OPSEC Exposure (85/100) -- Clearnet TLS SAN leak</strong>
+                <div style="font-size:9px;color:#94a3b8">Domain: aether-sec.com · 1h ago</div>
+              </div>
+            </div>
+            <div style="padding:8px 0;display:flex;gap:10px;align-items:center">
+              <span class="tag blue" style="border-color:#3b82f6;color:#60a5fa">STYLOMETRY</span>
+              <div>
+                <strong>Candidate continuity detected: DarkViper_2024 ➔ AetherSec_2026 (82.0% similarity)</strong>
+                <div style="font-size:9px;color:#94a3b8">Persona Module · 2h ago</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section id="live-session" class="panel panel-pad section hidden"></section>
+    </main>
+  </div>
+  <script src="/web/app.js"></script>
+</body>
+</html>

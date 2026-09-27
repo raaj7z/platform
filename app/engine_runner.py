@@ -277,6 +277,22 @@ def _persist_finding(
         run_id=run_id,
     )
 
+    try:
+        db.add_relationship(
+            investigation_id=investigation_id,
+            from_type="actor" if actor_id else "investigation",
+            from_value=actor_id or investigation_id,
+            relationship_type=f"has_{finding_type}",
+            to_type=str(finding_type),
+            to_value=value,
+            confidence=confidence,
+            source=str(source),
+            source_url=source_url,
+            run_id=run_id,
+        )
+    except Exception:
+        pass
+
     # --------------------------------------------------------
     # Evidence
     # --------------------------------------------------------
@@ -844,6 +860,24 @@ def _execute_engine(
             else "failed"
         ),
     )
+
+    try:
+        from .config import REPORTS_PATH
+        from .reports import generate_investigation_reports
+        full_rep = db.get_investigation(investigation_id)
+        if full_rep:
+            generate_investigation_reports(
+                db,
+                full_rep,
+                investigation_id=investigation_id,
+                output_dir=REPORTS_PATH,
+                run_id=run_id,
+                session_id=session_id,
+                module_id="osint-engine",
+            )
+            _event(db, job_id, "report", "Generated downloadable PDF, HTML, JSON, and CSV reports", 0.98, run_id=run_id)
+    except Exception as report_err:
+        _event(db, job_id, "warning", f"Report generation notice: {report_err}", 0.98, run_id=run_id)
 
     db.add_timeline_event(
         investigation_id=investigation_id,

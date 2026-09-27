@@ -1,1 +1,94 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRALAYX</title><link rel="stylesheet" href="/web/app.css"></head><body><div class="app"><aside class="sidebar"></aside><main class="main"><header class="top"><div><span class="kicker">CASE MANAGEMENT</span><h1>Investigations</h1></div></header><section class="panel"><div id="investigation-list"></div></section></main></div><script src="/web/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PRALAYX -- Investigations Case Management</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo-mark">◒</div>
+        <div>
+          <div class="logo-name">PRALAY<em>X</em></div>
+          <span class="logo-sub">Dark Web Threat De-anonymization</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <div class="nav-title">OPERATIONS</div>
+        <a data-page="dashboard" href="/web/index.html"><span class="nav-ico">⌂</span>Dashboard Overview</a>
+        <a data-page="crawl" href="/web/crawl.html"><span class="nav-ico">＋</span>New Crawl</a>
+        <a data-page="investigations" href="/web/investigations.html"><span class="nav-ico">⌕</span>Investigations Workspace</a>
+        <div class="nav-title">INTELLIGENCE</div>
+        <a data-page="correlation" href="/web/correlation.html"><span class="nav-ico">⌘</span>Relationship Graph</a>
+        <a data-page="osint" href="/web/osint.html"><span class="nav-ico">◎</span>OSINT & Misconfigurations</a>
+        <a data-page="analysis" href="/web/analysis.html"><span class="nav-ico">⌁</span>AI Stylometry / Persona</a>
+        <a data-page="reports" href="/web/reports.html"><span class="nav-ico">▤</span>Final Reports & Export</a>
+        <div class="nav-title">MONITORING</div>
+        <a data-page="monitoring" href="/web/monitoring.html"><span class="nav-ico">◉</span>Watchlist & Alerts</a>
+        <div class="nav-title">SYSTEM</div>
+        <a data-page="terminal" href="/web/terminal.html"><span class="nav-ico">›_</span>Terminal Log</a>
+        <a data-page="settings" href="/web/settings.html"><span class="nav-ico">⚙</span>Settings</a>
+      </nav>
+      <div class="sidebar-foot">
+        <button id="btn-toggle-theme" type="button" class="btn ghost" style="width:100%;margin-bottom:10px;font-size:11px;height:32px;display:flex;align-items:center;justify-content:center;gap:6px">☀️ Day Mode</button>
+        <div>PRALAYX v2.0 (SIH26151)<br>EVIDENCE · ENTITY · ATTRIBUTION</div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="top">
+        <div>
+          <span class="kicker">OPERATIONS & CASE MANAGEMENT</span>
+          <h1>Investigations Workspace</h1>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button id="btn-clear-history" class="btn red" style="font-size:11px;height:32px">🗑️ Clear Search & Crawl History</button>
+          <a href="/web/crawl.html" class="btn green" style="font-size:11px;height:32px;display:grid;place-items:center;text-decoration:none">＋ New Crawl Task</a>
+        </div>
+      </header>
+
+      <!-- Case Search & Filter Toolbar -->
+      <section class="panel panel-pad section" style="display:flex;justify-content:space-between;align-items:center;background:#0f172a;margin-bottom:16px">
+        <div style="display:flex;gap:10px;align-items:center">
+          <span style="font-size:12px;font-weight:700;color:#94a3b8">Filter Status:</span>
+          <button class="btn inv-filter active" data-status="all" style="height:32px;font-size:11px">All Cases</button>
+          <button class="btn ghost inv-filter" data-status="running" style="height:32px;font-size:11px">Running</button>
+          <button class="btn ghost inv-filter" data-status="completed" style="height:32px;font-size:11px">Completed</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="inv-search-input" class="input" style="height:32px;font-size:11px;width:220px" placeholder="Search target or Case ID...">
+        </div>
+      </section>
+
+      <!-- Active Processes & Live Job Stream -->
+      <div id="active-processes-container" class="panel panel-pad section hidden" style="background:#091326;border:1px solid #1e3660;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="status RUNNING">RUNNING</span>
+            <strong style="color:#38bdf8;font-size:14px">⚡ ACTIVE EXECUTION ENGINE PROCESSES</strong>
+          </div>
+          <span id="active-process-count" class="tag blue" style="font-size:10px">0 RUNNING</span>
+        </div>
+        <div id="active-processes-list"></div>
+      </div>
+
+      <!-- Investigations List Panel -->
+      <section class="panel">
+        <div class="section-title panel-pad" style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <h2>Active & Recorded Case Files</h2>
+            <span class="kicker">EVIDENCE-BACKED CASE REGISTRY</span>
+          </div>
+          <span id="case-count-badge" class="case-chip">0 CASES</span>
+        </div>
+        <div id="investigation-list" class="panel-pad" style="padding:0"></div>
+      </section>
+
+      <div id="inv-toast" class="notice hidden" style="margin-top:16px"></div>
+    </main>
+  </div>
+  <script src="/web/app.js"></script>
+</body>
+</html>

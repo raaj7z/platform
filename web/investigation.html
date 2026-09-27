@@ -1,1 +1,108 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRALAYX</title><link rel="stylesheet" href="/web/app.css"></head><body><div class="app"><aside class="sidebar"></aside><main class="main"><header class="top"><div><span class="kicker">CASE / EVIDENCE CHAIN</span><h1 id="case-title">Investigation</h1></div><span class="case-chip">ID PERSISTENT</span></header><div id="case-summary" class="grid g4"></div><div id="case-error" class="notice section"></div><section class="panel section"><div class="section-title panel-pad"><h2>Investigation timeline</h2><span>All stages</span></div><div id="case-timeline"></div></section><section class="panel section"><div class="section-title panel-pad"><h2>Findings / evidence leads</h2><span>Source-backed</span></div><div id="case-findings"></div></section></main></div><script src="/web/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PRALAYX -- Investigation Workspace</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo-mark">◒</div>
+        <div>
+          <div class="logo-name">PRALAY<em>X</em></div>
+          <span class="logo-sub">Dark Web Threat De-anonymization</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <div class="nav-title">OPERATIONS</div>
+        <a data-page="dashboard" href="/web/index.html"><span class="nav-ico">⌂</span>Dashboard Overview</a>
+        <a data-page="crawl" href="/web/crawl.html"><span class="nav-ico">＋</span>New Crawl</a>
+        <a data-page="investigations" href="/web/investigations.html"><span class="nav-ico">⌕</span>Investigations Workspace</a>
+        <div class="nav-title">INTELLIGENCE</div>
+        <a data-page="correlation" href="/web/correlation.html"><span class="nav-ico">⌘</span>Relationship Graph</a>
+        <a data-page="osint" href="/web/osint.html"><span class="nav-ico">◎</span>OSINT & Misconfigurations</a>
+        <a data-page="analysis" href="/web/analysis.html"><span class="nav-ico">⌁</span>AI Stylometry / Persona</a>
+        <a data-page="reports" href="/web/reports.html"><span class="nav-ico">▤</span>Final Reports & Export</a>
+        <div class="nav-title">MONITORING</div>
+        <a data-page="monitoring" href="/web/monitoring.html"><span class="nav-ico">◉</span>Watchlist & Alerts</a>
+        <div class="nav-title">SYSTEM</div>
+        <a data-page="terminal" href="/web/terminal.html"><span class="nav-ico">›_</span>Terminal Log</a>
+        <a data-page="settings" href="/web/settings.html"><span class="nav-ico">⚙</span>Settings</a>
+      </nav>
+      <div class="sidebar-foot">
+        <button id="btn-toggle-theme" type="button" class="btn ghost" style="width:100%;margin-bottom:10px;font-size:11px;height:32px;display:flex;align-items:center;justify-content:center;gap:6px">☀️ Day Mode</button>
+        <div>PRALAYX v2.0 (SIH26151)<br>EVIDENCE · ENTITY · ATTRIBUTION</div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="top">
+        <div>
+          <span class="kicker">OPERATIONS / INVESTIGATION WORKSPACE</span>
+          <h1 id="case-title">INV-DEMO-2026 -- http://darkmarket-v2.onion</h1>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="tag red" style="background:#7f1d1d22;color:#f87171">Cyber Crime</span>
+          <span class="status COMPLETED">IN PROGRESS</span>
+          <button id="run-module-btn" class="btn" style="height:28px;font-size:10px">+ Run Module</button>
+        </div>
+      </header>
+
+      <!-- Case Summary Banner & Quick Stats -->
+      <div id="case-summary" class="grid g4 section" style="margin-bottom:16px"></div>
+      <div id="case-error" class="notice section hidden"></div>
+
+      <!-- Quick Action Toolbar -->
+      <section class="panel panel-pad section" style="display:flex;justify-content:space-between;align-items:center;background:#0f172a;margin-bottom:16px">
+        <div style="display:flex;gap:10px;align-items:center">
+          <span style="font-size:11px;font-weight:bold;color:#94a3b8">Module Controls:</span>
+          <button class="btn ghost" onclick="triggerModuleRun('crawl')">▶ Crawl Target</button>
+          <button class="btn ghost" onclick="triggerModuleRun('osint')">▶ OSINT Enrich</button>
+          <button class="btn ghost" onclick="triggerModuleRun('persona')">▶ AI Stylometry</button>
+          <button class="btn ghost" onclick="triggerModuleRun('correlate')">▶ Refresh Graph</button>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:11px;font-weight:bold;color:#94a3b8">Export Report:</span>
+          <a href="/api/export/INV-DEMO-2026/pdf" class="btn" style="background:#dc2626;border:0;height:28px;padding:0 10px;font-size:10px;display:grid;place-items:center;text-decoration:none">PDF</a>
+          <a href="/api/export/INV-DEMO-2026/html" class="btn" style="background:#2563eb;border:0;height:28px;padding:0 10px;font-size:10px;display:grid;place-items:center;text-decoration:none">HTML</a>
+          <a href="/api/export/INV-DEMO-2026/json" class="btn" style="background:#059669;border:0;height:28px;padding:0 10px;font-size:10px;display:grid;place-items:center;text-decoration:none">JSON</a>
+          <a href="/api/export/INV-DEMO-2026/csv" class="btn" style="background:#7c3aed;border:0;height:28px;padding:0 10px;font-size:10px;display:grid;place-items:center;text-decoration:none">CSV</a>
+        </div>
+      </section>
+
+      <!-- Sub-view Navigation Tabs -->
+      <div class="tabs section" style="margin-bottom:14px">
+        <a class="active" href="#">Summary & Findings</a>
+        <a href="/web/correlation.html?id=INV-DEMO-2026">Relationship Graph</a>
+        <a href="/web/osint.html?id=INV-DEMO-2026">Misconfigurations & OSINT</a>
+        <a href="/web/analysis.html">AI Stylometry & Persona</a>
+        <a href="/web/reports.html">Reports & Exports</a>
+      </div>
+
+      <!-- Findings List & Timeline Split View -->
+      <div class="grid g2 section">
+        <section class="panel">
+          <div class="section-title panel-pad">
+            <h2>Latest Findings & Evidence Leads</h2>
+            <span class="kicker">SOURCE-BACKED</span>
+          </div>
+          <div id="case-findings" style="padding:10px"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title panel-pad">
+            <h2>Investigation Timeline</h2>
+            <span class="kicker">AUDIT TRAIL</span>
+          </div>
+          <div id="case-timeline" style="padding:10px"></div>
+        </section>
+      </div>
+
+      <section id="live-session" class="panel panel-pad section hidden" style="margin-top:16px"></section>
+    </main>
+  </div>
+  <script src="/web/app.js"></script>
+</body>
+</html>
