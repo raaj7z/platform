@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 import json
 import threading
 from contextlib import asynccontextmanager
@@ -345,9 +346,9 @@ def _scheduled_scan(
     )
 
     job_id = db.create_job(
-        "scheduled_osint",
-        investigation_id,
-        {
+        investigation_id=investigation_id,
+        job_type="scheduled_osint",
+        payload={
             "actor_id": actor_id,
             "target": target,
             "target_type": target_type,
@@ -461,9 +462,9 @@ def crawl(
     )
 
     job_id = db.create_job(
-        "crawl",
-        investigation_id,
-        request.model_dump(),
+        investigation_id=investigation_id,
+        job_type="crawl",
+        payload=request.model_dump(),
     )
 
     thread = threading.Thread(
@@ -508,9 +509,9 @@ def investigate(
     )
 
     job_id = db.create_job(
-        "osint",
-        investigation_id,
-        request.model_dump(),
+        investigation_id=investigation_id,
+        job_type="osint",
+        payload=request.model_dump(),
     )
 
     thread = threading.Thread(
@@ -688,6 +689,78 @@ def send_to_osint(
 # JOBS
 # ============================================================
 
+@app.get("/api/jobs")
+def list_jobs(status: Optional[str] = None, investigation_id: Optional[str] = None):
+    try:
+        with db.connect() as conn:
+            query = "SELECT * FROM sih_jobs"
+            params = []
+            conditions = []
+            if status:
+                conditions.append("LOWER(status) = ?")
+                params.append(status.lower())
+            if investigation_id:
+                conditions.append("investigation_id = ?")
+                params.append(investigation_id)
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+            query += " ORDER BY created_at DESC LIMIT 50"
+            rows = conn.execute(query, params).fetchall()
+            jobs = []
+            now = datetime.datetime.now(datetime.timezone.utc)
+            for r in rows:
+                j = dict(r)
+                payload = {}
+                if j.get("payload"):
+                    try:
+                        payload = json.loads(j["payload"])
+                    except Exception:
+                        pass
+                j["payload_parsed"] = payload
+                j["target"] = (
+                    payload.get("target")
+                    or (payload.get("urls")[0] if isinstance(payload.get("urls"), list) and payload.get("urls") else None)
+                    or j.get("investigation_id")
+                )
+                j_type = str(j.get("job_type", "")).lower()
+                if "osint" in j_type:
+                    j["process_name"] = "OSINT De-anonymization & Footprinting Engine"
+                elif "crawl" in j_type:
+                    j["process_name"] = "DarkWeb & Surface Web Crawler Engine"
+                else:
+                    j["process_name"] = f"{j_type.upper()} Execution Engine"
+
+                created_str = j.get("created_at")
+                elapsed_sec = 0
+                if created_str:
+                    try:
+                        dt = datetime.datetime.fromisoformat(created_str.replace('Z', '+00:00'))
+                        elapsed_sec = max(0, int((now - dt).total_seconds()))
+                    except Exception:
+                        pass
+                j["elapsed_seconds"] = elapsed_sec
+
+                prog = float(j.get("progress") or 0.0)
+                if prog >= 1.0 or str(j.get("status")).lower() in ("completed", "failed", "no_results"):
+                    est_rem = 0
+                elif prog > 0.05:
+                    est_total = elapsed_sec / prog
+                    est_rem = max(1, int(est_total - elapsed_sec))
+                else:
+                    est_rem = max(1, 35 - elapsed_sec) if "osint" in j_type else max(1, 45 - elapsed_sec)
+
+                j["estimated_seconds_remaining"] = est_rem
+
+                latest_evt = conn.execute(
+                    "SELECT message FROM sih_job_events WHERE job_id = ? ORDER BY created_at DESC LIMIT 1",
+                    (j["job_id"],)
+                ).fetchone()
+                j["latest_event"] = latest_evt["message"] if latest_evt else "Running process..."
+                jobs.append(j)
+            return {"status": "ok", "jobs": jobs, "total": len(jobs)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch jobs: {e}")
+
 @app.get("/api/jobs/{job_id}")
 def get_job(
     job_id: str,
@@ -702,11 +775,40 @@ def get_job(
             detail="job not found",
         )
 
+    evts = _events(job_id)
+    j = dict(job)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    created_str = j.get("created_at")
+    elapsed_sec = 0
+    if created_str:
+        try:
+            dt = datetime.datetime.fromisoformat(created_str.replace('Z', '+00:00'))
+            elapsed_sec = max(0, int((now - dt).total_seconds()))
+        except Exception:
+            pass
+    j["elapsed_seconds"] = elapsed_sec
+    j_type = str(j.get("job_type", "")).lower()
+    if "osint" in j_type:
+        j["process_name"] = "OSINT De-anonymization & Footprinting Engine"
+    elif "crawl" in j_type:
+        j["process_name"] = "DarkWeb & Surface Web Crawler Engine"
+    else:
+        j["process_name"] = f"{j_type.upper()} Execution Engine"
+
+    prog = float(j.get("progress") or 0.0)
+    if prog >= 1.0 or str(j.get("status")).lower() in ("completed", "failed", "no_results"):
+        est_rem = 0
+    elif prog > 0.05:
+        est_total = elapsed_sec / prog
+        est_rem = max(1, int(est_total - elapsed_sec))
+    else:
+        est_rem = max(1, 35 - elapsed_sec) if "osint" in j_type else max(1, 45 - elapsed_sec)
+
+    j["estimated_seconds_remaining"] = est_rem
+
     return {
-        "job": job,
-        "events": _events(
-            job_id,
-        ),
+        "job": j,
+        "events": evts,
     }
 
 
@@ -1416,6 +1518,92 @@ def export_html(
     )
 
 
+@app.get(
+    "/api/export/{investigation_id}/pdf",
+)
+def export_pdf(
+    investigation_id: str,
+):
+    result = _investigation(
+        investigation_id,
+    )
+
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="investigation not found",
+        )
+
+    data, mime_type, extension = build_report(
+        result,
+        report_type="full",
+        fmt="pdf",
+        title=f"PRALAYX Investigation {investigation_id}",
+    )
+
+    return Response(
+        content=data,
+        media_type=mime_type,
+        headers={
+            "Content-Disposition": (
+                "attachment; "
+                f'filename="{investigation_id}.pdf"'
+            )
+        },
+    )
+
+
+@app.get("/api/persona/synthetic-demo")
+def persona_synthetic_demo():
+    from .persona_adapter import get_synthetic_rebrand_demo
+    return get_synthetic_rebrand_demo()
+
+
+@app.post("/api/investigations/{investigation_id}/correlate")
+def correlate_investigation(investigation_id: str):
+    inv = _investigation(investigation_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="investigation not found")
+    _db_call("correlate_investigation", investigation_id)
+    return _investigation(investigation_id)
+
+
+@app.get("/api/investigations/{investigation_id}/misconfigurations")
+def misconfigurations_report(investigation_id: str):
+    inv = _investigation(investigation_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="investigation not found")
+
+    findings = inv.get("findings", [])
+    categories = {
+        "server_status": [],
+        "tls_certificates": [],
+        "service_banners": [],
+        "descriptor_inconsistencies": [],
+        "other": []
+    }
+
+    for f in findings:
+        ftype = str(f.get("finding_type", "")).lower()
+        val = str(f.get("value", "")).lower()
+        if "server-status" in ftype or "server_status" in val or "phpinfo" in val or ".git" in val:
+            categories["server_status"].append(f)
+        elif "tls" in ftype or "ssl" in ftype or "certificate" in ftype or "cert" in val:
+            categories["tls_certificates"].append(f)
+        elif "banner" in ftype or "banner" in val or "ssh" in val or "apache" in val or "nginx" in val:
+            categories["service_banners"].append(f)
+        elif "descriptor" in ftype or "leak" in val or "clearnet" in val:
+            categories["descriptor_inconsistencies"].append(f)
+        else:
+            categories["other"].append(f)
+
+    return {
+        "investigation_id": investigation_id,
+        "categories": categories,
+        "total_misconfigurations": sum(len(v) for v in categories.values()),
+    }
+
+
 # ============================================================
 # WATCHLIST
 # ============================================================
@@ -1612,6 +1800,134 @@ def terminal_history(
         "sessions": result,
     }
 
+
+# ============================================================
+# SYSTEM SETTINGS & MAINTENANCE
+# ============================================================
+
+SETTINGS_FILE = Path(DB_PATH).parent / "settings.json"
+
+class SystemSettings(BaseModel):
+    tor_host: str = "127.0.0.1"
+    tor_port: int = 9050
+    require_tor_for_onion: bool = True
+    shodan_api_key: str | None = ""
+    virustotal_api_key: str | None = ""
+    alienvault_api_key: str | None = ""
+    default_workers: int = 3
+    crawl_timeout_seconds: int = 120
+
+def _load_settings_json() -> dict[str, Any]:
+    if SETTINGS_FILE.exists():
+        try:
+            return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {
+        "tor_host": "127.0.0.1",
+        "tor_port": 9050,
+        "require_tor_for_onion": True,
+        "shodan_api_key": "",
+        "virustotal_api_key": "",
+        "alienvault_api_key": "",
+        "default_workers": 3,
+        "crawl_timeout_seconds": 120,
+    }
+
+@app.get("/api/settings")
+def get_settings():
+    s = _load_settings_json()
+    s["shodan_configured"] = bool(s.get("shodan_api_key"))
+    s["virustotal_configured"] = bool(s.get("virustotal_api_key"))
+    s["alienvault_configured"] = bool(s.get("alienvault_api_key"))
+    db_p = Path(DB_PATH)
+    s["database_path"] = str(db_p)
+    s["database_size_bytes"] = db_p.stat().st_size if db_p.exists() else 0
+    return s
+
+@app.post("/api/settings")
+def update_settings(req: SystemSettings):
+    data = req.model_dump()
+    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    return {"status": "ok", "message": "System configuration updated successfully", "settings": data}
+
+@app.post("/api/settings/test-tor")
+def test_tor():
+    import socket
+    s = _load_settings_json()
+    host = s.get("tor_host", "127.0.0.1")
+    port = int(s.get("tor_port", 9050))
+    ok = False
+    msg = ""
+    try:
+        with socket.create_connection((host, port), timeout=3.0):
+            ok = True
+            msg = f"Tor SOCKS proxy active and listening on {host}:{port}"
+    except Exception as e:
+        ok = False
+        msg = f"Tor SOCKS proxy not reachable at {host}:{port} ({e})"
+
+    return {"ok": ok, "status": "ONLINE" if ok else "OFFLINE", "message": msg, "host": host, "port": port}
+
+@app.post("/api/settings/vacuum-db")
+def vacuum_db():
+    try:
+        with db.connect() as conn:
+            conn.execute("VACUUM")
+            conn.execute("ANALYZE")
+            conn.commit()
+        db_p = Path(DB_PATH)
+        size = db_p.stat().st_size if db_p.exists() else 0
+        return {"status": "ok", "message": "Database optimized successfully", "size_bytes": size}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database optimization failed: {e}")
+
+@app.post("/api/history/clear")
+def clear_history():
+    tables = [
+        "sih_reports",
+        "sih_raw_snapshots",
+        "sih_job_events",
+        "sih_jobs",
+        "sih_investigation_timeline",
+        "sih_relationships",
+        "sih_entity_sightings",
+        "sih_observations",
+        "sih_evidence",
+        "sih_findings",
+        "sih_identifiers",
+        "sih_runs",
+        "sih_sessions",
+        "sih_watchlist",
+        "sih_alerts",
+        "sih_investigations",
+        "sih_actors",
+    ]
+    try:
+        with db.connect() as conn:
+            for t in tables:
+                try:
+                    conn.execute(f"DELETE FROM {t}")
+                except Exception:
+                    pass
+            conn.commit()
+            try:
+                conn.execute("VACUUM")
+                conn.execute("ANALYZE")
+                conn.commit()
+            except Exception:
+                pass
+
+        try:
+            from .seed_demo import seed
+            seed()
+        except Exception:
+            pass
+
+        return {"status": "ok", "message": "Search, crawl history, and database records cleared successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Clear history failed: {e}")
 
 # ============================================================
 # RUN SERVER

@@ -129,13 +129,43 @@ class DB:
     # Investigation
     # ------------------------------------------------------------------
 
+    def get_investigation_by_target(self, target: str) -> Optional[dict]:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT investigation_id, actor_id, target, target_type
+                FROM sih_investigations
+                WHERE target = ? OR target = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (target.strip(), target.strip().rstrip("/")),
+            ).fetchone()
+            return self._row(row)
+
     def create_investigation(
         self,
         target: str,
         target_type: str = "url",
         source: Optional[str] = None,
         notes: Optional[str] = None,
-    ) -> str:
+    ) -> tuple[str, str]:
+        clean_target = target.strip()
+        existing = self.get_investigation_by_target(clean_target)
+        if existing and existing.get("investigation_id") and existing.get("actor_id"):
+            now = self.now()
+            with self.connect() as conn:
+                conn.execute(
+                    """
+                    UPDATE sih_investigations
+                    SET updated_at = ?, status = 'running'
+                    WHERE investigation_id = ?
+                    """,
+                    (now, existing["investigation_id"]),
+                )
+                conn.commit()
+            return existing["investigation_id"], existing["actor_id"]
+
         investigation_id = self._id("INV")
         actor_id = self._id("ACT")
         now = self.now()
@@ -155,7 +185,7 @@ class DB:
                 """,
                 (
                     actor_id,
-                    target,
+                    clean_target,
                     "unknown",
                     0.0,
                     now,
@@ -180,7 +210,7 @@ class DB:
                 """,
                 (
                     investigation_id,
-                    target,
+                    clean_target,
                     target_type,
                     "running",
                     source,
@@ -193,7 +223,7 @@ class DB:
 
             conn.commit()
 
-        return investigation_id
+        return investigation_id, actor_id
 
     def get_investigation(
         self,
@@ -284,6 +314,28 @@ class DB:
                     (investigation_id,),
                 ).fetchall()
             )
+
+            if not investigation["relationships"] and investigation.get("findings"):
+                synth = []
+                target_val = investigation.get("target") or investigation_id
+                actor_val = investigation.get("actor_id") or target_val
+                for idx, f in enumerate(investigation["findings"]):
+                    f_type = f.get("finding_type", "finding")
+                    f_val = f.get("value")
+                    if f_val:
+                        synth.append({
+                            "relationship_id": f"SYNTH-{idx}-{f.get('finding_id', 'REL')}",
+                            "investigation_id": investigation_id,
+                            "from_type": "actor",
+                            "from_value": actor_val,
+                            "relationship_type": f"has_{f_type}",
+                            "to_type": f_type,
+                            "to_value": f_val,
+                            "confidence": f.get("confidence", 0.8),
+                            "source": f.get("source", "crawler"),
+                            "source_url": f.get("source_url")
+                        })
+                investigation["relationships"] = synth
 
             investigation["reports"] = self._rows(
                 conn.execute(

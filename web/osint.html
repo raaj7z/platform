@@ -1,1 +1,191 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRALAYX</title><link rel="stylesheet" href="/web/app.css"></head><body><div class="app"><aside class="sidebar"></aside><main class="main"><header class="top"><div><span class="kicker">OSINT / MULTI-SOURCE</span><h1>OSINT Engine</h1></div></header><section class="panel panel-pad"><div class="notice"><strong>Investigation-linked:</strong> results are stored as evidence and findings under the selected investigation. Provider errors remain visible as execution errors.</div><form id="osint-form" class="grid g3 section"><label>Investigation ID<input class="input" id="osint-investigation" placeholder="INV-XXXXXXXX" required></label><label>Identifier<input class="input" id="osint-target" placeholder="username / email / IP / domain" required></label><label>Identifier type<select class="select" id="osint-type"><option>username</option><option>email</option><option>ip</option><option>domain</option><option>url</option><option>pgp</option><option>crypto</option></select></label><button class="btn">Run OSINT</button></form></section><section id="osint-result" class="panel panel-pad section hidden"></section></main></div><script src="/web/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PRALAYX -- Misconfigurations & OSINT Findings</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo-mark">◒</div>
+        <div>
+          <div class="logo-name">PRALAY<em>X</em></div>
+          <span class="logo-sub">Dark Web Threat De-anonymization</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <div class="nav-title">OPERATIONS</div>
+        <a data-page="dashboard" href="/web/index.html"><span class="nav-ico">⌂</span>Dashboard Overview</a>
+        <a data-page="crawl" href="/web/crawl.html"><span class="nav-ico">＋</span>New Crawl</a>
+        <a data-page="investigations" href="/web/investigations.html"><span class="nav-ico">⌕</span>Investigations Workspace</a>
+        <div class="nav-title">INTELLIGENCE</div>
+        <a data-page="correlation" href="/web/correlation.html"><span class="nav-ico">⌘</span>Relationship Graph</a>
+        <a data-page="osint" href="/web/osint.html"><span class="nav-ico">◎</span>OSINT & Misconfigurations</a>
+        <a data-page="analysis" href="/web/analysis.html"><span class="nav-ico">⌁</span>AI Stylometry / Persona</a>
+        <a data-page="reports" href="/web/reports.html"><span class="nav-ico">▤</span>Final Reports & Export</a>
+        <div class="nav-title">MONITORING</div>
+        <a data-page="monitoring" href="/web/monitoring.html"><span class="nav-ico">◉</span>Watchlist & Alerts</a>
+        <div class="nav-title">SYSTEM</div>
+        <a data-page="terminal" href="/web/terminal.html"><span class="nav-ico">›_</span>Terminal Log</a>
+        <a data-page="settings" href="/web/settings.html"><span class="nav-ico">⚙</span>Settings</a>
+      </nav>
+      <div class="sidebar-foot">
+        <button id="btn-toggle-theme" type="button" class="btn ghost" style="width:100%;margin-bottom:10px;font-size:11px;height:32px;display:flex;align-items:center;justify-content:center;gap:6px">☀️ Day Mode</button>
+        <div>PRALAYX v2.0 (SIH26151)<br>EVIDENCE · ENTITY · ATTRIBUTION</div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="top">
+        <div>
+          <span class="kicker">TECHNICAL INDICATORS & ENRICHMENT</span>
+          <h1>Misconfigurations & OSINT Findings</h1>
+        </div>
+        <span class="case-chip">4 PS CATEGORIES ACTIVE</span>
+      </header>
+
+      <!-- Manual OSINT Target Input Bar -->
+      <section class="panel panel-pad hero section" style="background:linear-gradient(135deg, #0f172a, #1e293b);margin-bottom:16px">
+        <div>
+          <span class="kicker" style="color:#38bdf8">MANUAL / DERIVED OSINT ENRICHMENT</span>
+          <h2>Enrich Target Identifiers Across OSINT Providers</h2>
+          <p>Scans handles, domains, IPs, BTC wallets, PGP keys across VirusTotal, Shodan, DNS, and Whois.</p>
+        </div>
+        <form id="osint-form" class="form">
+          <input class="input" id="osint-investigation" value="INV-DEMO-2026" placeholder="Investigation ID" required>
+          <input class="input" id="osint-target" placeholder="Observable Target (Domain, IP, Handle, Wallet)" required>
+          <select class="select" id="osint-type">
+            <option value="username">Username / Handle</option>
+            <option value="domain">Domain</option>
+            <option value="ip">IP Address</option>
+            <option value="crypto">Crypto Wallet</option>
+            <option value="pgp">PGP Key</option>
+          </select>
+          <button class="btn">+ Run OSINT</button>
+        </form>
+      </section>
+
+      <!-- Panel 4: Misconfiguration & Infrastructure Report -->
+      <section class="panel section" style="margin-bottom:16px">
+        <div class="section-title panel-pad">
+          <h2>4. Technical Indicators & Misconfiguration Report (SIH26151 Core)</h2>
+          <span class="kicker">4 EXPLICIT CATEGORIES</span>
+        </div>
+        <div class="panel-pad">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Category Type</th>
+                <th>Observed Evidence / Indicator Details</th>
+                <th>Source Module</th>
+                <th>Validation Method</th>
+                <th>Confidence</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="tag red">Exposed Server-Status</span></td>
+                <td><strong>Apache/2.4.41 (Ubuntu) /server-status exposed</strong> at http://darkmarket-v2.onion/server-status</td>
+                <td>DarkWeb-Deanonymization</td>
+                <td>HTTP SOCKS5 probe (200 OK, 4.5KB)</td>
+                <td><span class="status COMPLETED">95%</span></td>
+                <td><span class="tag green">Confirmed</span></td>
+              </tr>
+              <tr>
+                <td><span class="tag amber">TLS / SSL Certificate</span></td>
+                <td><strong>TLS SAN Clearnet Link:</strong> CN='aether-sec.com' (SANs: *.aether-sec.com, darkmarket-v2.onion)</td>
+                <td>DarkWeb-Deanonymization</td>
+                <td>SOCKS5 TLS Handshake</td>
+                <td><span class="status COMPLETED">88%</span></td>
+                <td><span class="tag amber">Needs Review</span></td>
+              </tr>
+              <tr>
+                <td><span class="tag blue">Default Service Banner</span></td>
+                <td><strong>Default Service Banner:</strong> OpenSSH_7.9p1 Debian 10 / Apache 2.4.41 on Port 22/80</td>
+                <td>DarkWeb-Deanonymization</td>
+                <td>SOCKS Banner Grab</td>
+                <td><span class="status COMPLETED">90%</span></td>
+                <td><span class="tag green">Confirmed</span></td>
+              </tr>
+              <tr>
+                <td><span class="tag purple">Descriptor Inconsistency</span></td>
+                <td><strong>Descriptor Inconsistency:</strong> Clearnet contact email 'admin@aether-sec.com' in HTML meta</td>
+                <td>DarkWeb-Deanonymization</td>
+                <td>HTML Parser</td>
+                <td><span class="status COMPLETED">85%</span></td>
+                <td><span class="tag amber">Needs Review</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Panel 5: OSINT Provider Results -->
+      <section class="panel section">
+        <div class="section-title panel-pad">
+          <h2>5. OSINT Findings & Provider Verification</h2>
+          <span class="kicker">ENRICHMENT PROVIDERS</span>
+        </div>
+        <div class="panel-pad">
+          <div style="display:flex;gap:10px;margin-bottom:12px;font-size:10px">
+            <span class="tag green">✔ Shodan (Checked)</span>
+            <span class="tag green">✔ VirusTotal (Checked)</span>
+            <span class="tag green">✔ CryptoScanner (Checked)</span>
+            <span class="tag green">✔ PGPScanner (Checked)</span>
+            <span class="tag amber">⚠ AbuseIPDB (No API Key)</span>
+            <span class="tag amber">⚠ Censys (No API Key)</span>
+          </div>
+
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Finding Type</th>
+                <th>Observed Value & Details</th>
+                <th>Source URL / Reference</th>
+                <th>Confidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Shodan</td>
+                <td>IP Infrastructure Match</td>
+                <td>IP 192.0.2.45 hosting OpenSSH_7.9p1 with matching TLS certificate fingerprint</td>
+                <td><a class="tag" href="https://www.shodan.io/host/192.0.2.45" target="_blank">View Shodan ↗</a></td>
+                <td><span class="status COMPLETED">85%</span></td>
+              </tr>
+              <tr>
+                <td>VirusTotal</td>
+                <td>Domain Registration</td>
+                <td>aether-sec.com registered via Namecheap 2024-03-12 (0/92 malicious)</td>
+                <td><a class="tag" href="https://www.virustotal.com/gui/domain/aether-sec.com" target="_blank">View VirusTotal ↗</a></td>
+                <td><span class="status COMPLETED">90%</span></td>
+              </tr>
+              <tr>
+                <td>CryptoScanner</td>
+                <td>Bitcoin Wallet</td>
+                <td>BTC Address 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa observed in vendor signature</td>
+                <td><a class="tag" href="http://darkmarket-v2.onion/vendor/darkviper" target="_blank">View Source ↗</a></td>
+                <td><span class="status COMPLETED">95%</span></td>
+              </tr>
+              <tr>
+                <td>PGPScanner</td>
+                <td>PGP Key ID</td>
+                <td>0x9E8F7A6B5C4D3E2F (User: DarkViper &lt;darkviper@secmail.invalid&gt;)</td>
+                <td><a class="tag" href="http://darkmarket-v2.onion/pgp.asc" target="_blank">View Key ↗</a></td>
+                <td><span class="status COMPLETED">92%</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="osint-result" class="panel panel-pad section hidden" style="margin-top:16px"></section>
+    </main>
+  </div>
+  <script src="/web/app.js"></script>
+</body>
+</html>
