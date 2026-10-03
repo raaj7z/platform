@@ -6,5 +6,6 @@ __pycache__/
 data/
 logs/
 .env
+.env.example
 .venv/
 venv/
