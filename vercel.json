@@ -12,20 +12,24 @@
   ],
   "routes": [
     {
+      "src": "/web/(.*)",
+      "dest": "/web/$1"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "api/index.py"
     },
     {
-      "src": "/web/(.*)",
-      "dest": "/web/"
+      "src": "/(.*\\.css)",
+      "dest": "/web/$1"
     },
     {
-      "src": "/(app\\.css|app\\.js)",
-      "dest": "/web/"
+      "src": "/(.*\\.js)",
+      "dest": "/web/$1"
     },
     {
       "src": "/(.*\\.html)",
-      "dest": "/web/"
+      "dest": "/web/$1"
     },
     {
       "src": "/",
@@ -36,4 +40,4 @@
       "dest": "api/index.py"
     }
   ]
-}
+}}
