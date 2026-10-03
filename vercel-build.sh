@@ -17,26 +17,26 @@ git clone --depth 1 https://github.com/raaj7z/osint-engine.git \
 git clone --depth 1 https://github.com/raaj7z/Persona.git \
     vendor/Persona
 
-echo "=== Installing crawler requirements ==="
+echo "=== Installing Platform dependencies ==="
+
+python3 -m pip install \
+    -r requirements.txt
+
+echo "=== Installing Crawler dependencies ==="
 
 python3 -m pip install \
     -r vendor/DarkWeb-Deanonymization/requirements.txt
 
-echo "=== Installing OSINT requirements ==="
+echo "=== Installing OSINT dependencies ==="
 
 python3 -m pip install \
     -r vendor/osint-engine/requirements.txt
 
 echo "=== Persona source included; skipping heavyweight ML dependencies ==="
 
-# IMPORTANT:
-# Do NOT install vendor/Persona/requirements.txt here.
-#
-# Persona requirements include sentence-transformers, which pulls
-# a very large ML/PyTorch dependency tree and can exceed Vercel's
-# serverless function size limit.
-#
-# The existing demo data can be used without the full Persona ML stack.
+# Do NOT install Persona/requirements.txt here.
+# sentence-transformers pulls PyTorch and can make the Vercel
+# serverless function exceed the size limit.
 
 echo "=== Patching crawler runtime paths for Vercel ==="
 
