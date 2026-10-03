@@ -8,8 +8,10 @@ import sqlite3
 from datetime import datetime, timezone
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "pralayx.db")
-SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "..", "shared", "schema_sqlite.sql")
+DB_PATH = os.getenv(
+    "PRALAYX_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "..", "data", "pralayx.db"),
+)
 
 def seed():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
