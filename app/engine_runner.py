@@ -8,6 +8,7 @@ import sys
 import traceback
 from pathlib import Path
 from typing import Any
+from app.config import OSINT_ENGINE_PATH
 
 
 # ============================================================
@@ -18,9 +19,8 @@ def load_engine():
     import importlib
     import importlib.util
 
-    root = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "osint-engine")
-    )
+    root = os.path.abspath(OSINT_ENGINE_PATH)
+    
     if not os.path.isdir(root):
         raise RuntimeError(f"OSINT engine directory not found: {root}")
 
