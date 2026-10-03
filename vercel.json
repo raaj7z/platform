@@ -1,43 +1,9 @@
 {
-  "version": 2,
-  "builds": [
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
     {
-      "src": "api/index.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "web/**",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/web/(.*)",
-      "dest": "/web/$1"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "api/index.py"
-    },
-    {
-      "src": "/(.*\\.css)",
-      "dest": "/web/$1"
-    },
-    {
-      "src": "/(.*\\.js)",
-      "dest": "/web/$1"
-    },
-    {
-      "src": "/(.*\\.html)",
-      "dest": "/web/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/web/index.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "api/index.py"
+      "source": "/",
+      "destination": "/web/index.html"
     }
   ]
 }
