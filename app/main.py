@@ -75,6 +75,15 @@ else:
         f"Shared schema not found: {SCHEMA_PATH}"
     )
 
+if VERCEL_DEMO_MODE:
+    try:
+        from .vercel_demo import initialize_vercel_demo
+
+        initialize_vercel_demo()
+    except Exception as exc:
+        print(
+            f"PRALAYX Vercel demo initialization failed: {exc}"
+        )
 
 # ============================================================
 # GLOBAL STATE
