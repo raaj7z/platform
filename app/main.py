@@ -34,6 +34,7 @@ from .config import (
     REPORTS_PATH,
     SCHEMA_PATH,
     WEB_PATH,
+    VERCEL_DEMO_MODE,
 )
 from .crawler_runner import (
     run as run_crawler,
