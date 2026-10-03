@@ -1,27 +1,45 @@
 #!/bin/bash
 set -e
 
+echo "=== PRALAYX Vercel build ==="
+
 rm -rf vendor
 mkdir -p vendor
 
-# Vendor the supporting repositories.
-git clone --depth 1 https://github.com/raaj7z/DarkWeb-Deanonymization.git vendor/DarkWeb-Deanonymization
-git clone --depth 1 https://github.com/raaj7z/osint-engine.git vendor/osint-engine
-git clone --depth 1 https://github.com/raaj7z/Persona.git vendor/Persona
+echo "=== Cloning supporting repositories ==="
 
-# Install only the dependencies needed by the Vercel runtime.
-# Do NOT install Persona's full ML stack here.
-python3 -m pip install -r vendor/DarkWeb-Deanonymization/requirements.txt
-python3 -m pip install -r vendor/osint-engine/requirements.txt
+git clone --depth 1 https://github.com/raaj7z/DarkWeb-Deanonymization.git \
+    vendor/DarkWeb-Deanonymization
 
-# Persona source is included for compatibility, but its heavyweight
-# sentence-transformers / PyTorch stack is intentionally not installed
-# in the Vercel function.
+git clone --depth 1 https://github.com/raaj7z/osint-engine.git \
+    vendor/osint-engine
+
+git clone --depth 1 https://github.com/raaj7z/Persona.git \
+    vendor/Persona
+
+echo "=== Installing crawler requirements ==="
+
+python3 -m pip install \
+    -r vendor/DarkWeb-Deanonymization/requirements.txt
+
+echo "=== Installing OSINT requirements ==="
+
+python3 -m pip install \
+    -r vendor/osint-engine/requirements.txt
+
+echo "=== Persona source included; skipping heavyweight ML dependencies ==="
+
+# IMPORTANT:
+# Do NOT install vendor/Persona/requirements.txt here.
 #
-# Local WSL Persona installation remains unchanged.
+# Persona requirements include sentence-transformers, which pulls
+# a very large ML/PyTorch dependency tree and can exceed Vercel's
+# serverless function size limit.
+#
+# The existing demo data can be used without the full Persona ML stack.
 
-# Vercel filesystem is read-only except /tmp.
-# Redirect crawler runtime data to /tmp.
+echo "=== Patching crawler runtime paths for Vercel ==="
+
 python3 - <<'PY'
 from pathlib import Path
 
@@ -53,5 +71,8 @@ if old not in text:
     raise SystemExit("Expected crawler config block was not found")
 
 path.write_text(text.replace(old, new))
-print("Patched crawler runtime paths for Vercel")
+
+print("Crawler Vercel runtime paths patched.")
 PY
+
+echo "=== Build complete ==="
