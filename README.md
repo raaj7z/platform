@@ -1,6 +1,4 @@
-# PRALAYX — Dark Web De-anonymization & Threat Intelligence Platform
-
-> **National Technical Research Organisation (NTRO) / SIH Team SIH-26151**  
+# PRALAYX — De-anonymization & Threat Intelligence Platform
 > *An Enterprise-Grade Darknet Persona Attribution, OSINT Enrichment, Behavioral Stylometry, and Forensic Dossier Platform.*
 
 ---
@@ -175,4 +173,4 @@ Access the Analyst Web Interface in your browser:
 
 ## 📜 License & Citation
 
-Developed for **SIH Team SIH-26151** — Dark Web De-anonymization & Threat Intelligence Platform. All rights reserved.
+Developed for Authorised use only . All rights reserved.
