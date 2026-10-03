@@ -6,10 +6,5 @@
       "source": "/",
       "destination": "/web/index.html"
     }
-  ],
-  "functions": {
-    "api/index.py": {
-      "includeFiles": "vendor/**"
-    }
-  }
+  ]
 }
