@@ -4,17 +4,24 @@ set -e
 rm -rf vendor
 mkdir -p vendor
 
-# Vendor the three supporting repositories
+# Vendor the supporting repositories.
 git clone --depth 1 https://github.com/raaj7z/DarkWeb-Deanonymization.git vendor/DarkWeb-Deanonymization
 git clone --depth 1 https://github.com/raaj7z/osint-engine.git vendor/osint-engine
 git clone --depth 1 https://github.com/raaj7z/Persona.git vendor/Persona
 
-# Install complete dependencies for each module
+# Install only the dependencies needed by the Vercel runtime.
+# Do NOT install Persona's full ML stack here.
 python3 -m pip install -r vendor/DarkWeb-Deanonymization/requirements.txt
 python3 -m pip install -r vendor/osint-engine/requirements.txt
-python3 -m pip install -r vendor/Persona/requirements.txt
 
-# Vercel runtime: crawler must write to /tmp instead of read-only /var/task
+# Persona source is included for compatibility, but its heavyweight
+# sentence-transformers / PyTorch stack is intentionally not installed
+# in the Vercel function.
+#
+# Local WSL Persona installation remains unchanged.
+
+# Vercel filesystem is read-only except /tmp.
+# Redirect crawler runtime data to /tmp.
 python3 - <<'PY'
 from pathlib import Path
 
@@ -43,7 +50,7 @@ DB_PATH = DATA_DIR / 'crawler.db'
 """
 
 if old not in text:
-    raise SystemExit("Expected crawler config path block was not found")
+    raise SystemExit("Expected crawler config block was not found")
 
 path.write_text(text.replace(old, new))
 print("Patched crawler runtime paths for Vercel")
