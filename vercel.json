@@ -1,9 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "rm -rf vendor && mkdir -p vendor && git clone --depth 1 https://github.com/raaj7z/DarkWeb-Deanonymization.git vendor/DarkWeb-Deanonymization && git clone --depth 1 https://github.com/raaj7z/osint-engine.git vendor/osint-engine && git clone --depth 1 https://github.com/raaj7z/Persona.git vendor/Persona",
   "rewrites": [
     {
       "source": "/",
       "destination": "/web/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/index.py": {
+      "includeFiles": [
+        "vendor/**",
+        "shared/**"
+      ]
+    }
+  }
 }
