@@ -2,15 +2,19 @@
 set -e
 
 rm -rf vendor
-
 mkdir -p vendor
 
+# Vendor the three supporting repositories
 git clone --depth 1 https://github.com/raaj7z/DarkWeb-Deanonymization.git vendor/DarkWeb-Deanonymization
 git clone --depth 1 https://github.com/raaj7z/osint-engine.git vendor/osint-engine
 git clone --depth 1 https://github.com/raaj7z/Persona.git vendor/Persona
 
-# Vercel's deployed filesystem is read-only.
-# Redirect crawler runtime-write directories to /tmp.
+# Install complete dependencies for each module
+python3 -m pip install -r vendor/DarkWeb-Deanonymization/requirements.txt
+python3 -m pip install -r vendor/osint-engine/requirements.txt
+python3 -m pip install -r vendor/Persona/requirements.txt
+
+# Vercel runtime: crawler must write to /tmp instead of read-only /var/task
 python3 - <<'PY'
 from pathlib import Path
 
