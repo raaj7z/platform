@@ -9,10 +9,7 @@
   ],
   "functions": {
     "api/index.py": {
-      "includeFiles": [
-        "vendor/**",
-        "shared/**"
-      ]
+      "includeFiles": "vendor/**"
     }
   }
 }
