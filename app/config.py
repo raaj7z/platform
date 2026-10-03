@@ -59,27 +59,55 @@ SCHEMA_PATH = resolve_path(
 # ---------------------------------------------------------------------------
 # Crawler repository
 # ---------------------------------------------------------------------------
+#
+# Local development:
+#   Uses the sibling DarkWeb-Deanonymization repository.
+#
+# Vercel:
+#   Uses the deployment-local vendor copy created during the Vercel build.
+#
 
-CRAWLER_PATH = resolve_path(
-    os.getenv(
-        "CRAWLER_PATH",
-        "../DarkWeb-Deanonymization",
+if os.getenv("VERCEL"):
+    CRAWLER_PATH = resolve_path(
+        os.getenv(
+            "CRAWLER_PATH",
+            "vendor/DarkWeb-Deanonymization",
+        )
     )
-)
+else:
+    CRAWLER_PATH = resolve_path(
+        os.getenv(
+            "CRAWLER_PATH",
+            "../DarkWeb-Deanonymization",
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
 # OSINT engine repository
 # ---------------------------------------------------------------------------
+#
+# Local development:
+#   Uses the sibling osint-engine repository.
+#
+# Vercel:
+#   Uses the deployment-local vendor copy.
+#
 
-OSINT_ENGINE_PATH = resolve_path(
-    os.getenv(
-        "OSINT_ENGINE_PATH",
-        "../osint-engine",
+if os.getenv("VERCEL"):
+    OSINT_ENGINE_PATH = resolve_path(
+        os.getenv(
+            "OSINT_ENGINE_PATH",
+            "vendor/osint-engine",
+        )
     )
-)
-
-
+else:
+    OSINT_ENGINE_PATH = resolve_path(
+        os.getenv(
+            "OSINT_ENGINE_PATH",
+            "../osint-engine",
+        )
+    )
 # ---------------------------------------------------------------------------
 # Web application
 # ---------------------------------------------------------------------------
