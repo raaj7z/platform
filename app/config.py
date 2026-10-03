@@ -119,12 +119,15 @@ else:
 # Raw crawler and OSINT outputs should remain available for auditability.
 #
 
-RAW_DATA_PATH = resolve_path(
-    os.getenv(
-        "PRALAYX_RAW_DATA_PATH",
-        "data/raw",
+if os.getenv("VERCEL"):
+    RAW_DATA_PATH = "/tmp/raw"
+else:
+    RAW_DATA_PATH = resolve_path(
+        os.getenv(
+            "PRALAYX_RAW_DATA_PATH",
+            "data/raw",
+        )
     )
-)
 
 
 # ---------------------------------------------------------------------------
