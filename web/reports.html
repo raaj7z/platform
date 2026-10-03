@@ -3,118 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>PRALAYX -- Final Reports & Export</title>
+  <title>PRALAYX — Final Reports & Dossiers</title>
   <link rel="stylesheet" href="/web/app.css">
 </head>
 <body>
   <div class="app">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="logo-mark">◒</div>
-        <div>
-          <div class="logo-name">PRALAY<em>X</em></div>
-          <span class="logo-sub">Dark Web Threat De-anonymization</span>
-        </div>
-      </div>
-      <nav class="nav">
-        <div class="nav-title">OPERATIONS</div>
-        <a data-page="dashboard" href="/web/index.html"><span class="nav-ico">⌂</span>Dashboard Overview</a>
-        <a data-page="crawl" href="/web/crawl.html"><span class="nav-ico">＋</span>New Crawl</a>
-        <a data-page="investigations" href="/web/investigations.html"><span class="nav-ico">⌕</span>Investigations Workspace</a>
-        <div class="nav-title">INTELLIGENCE</div>
-        <a data-page="correlation" href="/web/correlation.html"><span class="nav-ico">⌘</span>Relationship Graph</a>
-        <a data-page="osint" href="/web/osint.html"><span class="nav-ico">◎</span>OSINT & Misconfigurations</a>
-        <a data-page="analysis" href="/web/analysis.html"><span class="nav-ico">⌁</span>AI Stylometry / Persona</a>
-        <a data-page="reports" href="/web/reports.html"><span class="nav-ico">▤</span>Final Reports & Export</a>
-        <div class="nav-title">MONITORING</div>
-        <a data-page="monitoring" href="/web/monitoring.html"><span class="nav-ico">◉</span>Watchlist & Alerts</a>
-        <div class="nav-title">SYSTEM</div>
-        <a data-page="terminal" href="/web/terminal.html"><span class="nav-ico">›_</span>Terminal Log</a>
-        <a data-page="settings" href="/web/settings.html"><span class="nav-ico">⚙</span>Settings</a>
-      </nav>
-      <div class="sidebar-foot">
-        <button id="btn-toggle-theme" type="button" class="btn ghost" style="width:100%;margin-bottom:10px;font-size:11px;height:32px;display:flex;align-items:center;justify-content:center;gap:6px">☀️ Day Mode</button>
-        <div>PRALAYX v2.0 (SIH26151)<br>EVIDENCE · ENTITY · ATTRIBUTION</div>
-      </div>
-    </aside>
+    <aside class="sidebar"><!-- Nav rendered by app.js --></aside>
     <main class="main">
-      <header class="top">
-        <div>
-          <span class="kicker">CONSOLIDATED CASE REPORTS</span>
-          <h1>Final Report -- Complete View & Multi-Format Export</h1>
-        </div>
-        <span class="case-chip">REPRODUCIBLE EXPORTS</span>
-      </header>
+      <div id="investigation-context-root"></div>
 
-      <!-- Executive Case Summary Banner & Action Panel -->
-      <section class="panel panel-pad section" style="background:linear-gradient(135deg, #0f172a, #1e293b);margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <span class="kicker" style="color:#38bdf8">INVESTIGATION ID: INV-DEMO-2026</span>
-            <h2 style="margin:2px 0;font-size:16px">Complete De-anonymization Executive Report</h2>
-            <p style="margin:0;font-size:11px">Assembled from all persisted records: Web Evidence, Misconfigurations, OSINT, Stylometry, Relationships, and Timeline.</p>
-          </div>
-          <div style="display:flex;gap:8px">
-            <a href="/api/export/INV-DEMO-2026/pdf" class="btn" style="background:#dc2626;border:0;display:grid;place-items:center;text-decoration:none;padding:0 14px">📄 Download PDF</a>
-            <a href="/api/export/INV-DEMO-2026/html" class="btn" style="background:#2563eb;border:0;display:grid;place-items:center;text-decoration:none;padding:0 14px">🌐 Download HTML</a>
-            <a href="/api/export/INV-DEMO-2026/json" class="btn" style="background:#059669;border:0;display:grid;place-items:center;text-decoration:none;padding:0 14px">{} Download JSON</a>
-            <a href="/api/export/INV-DEMO-2026/csv" class="btn" style="background:#7c3aed;border:0;display:grid;place-items:center;text-decoration:none;padding:0 14px">📊 Download CSV</a>
-          </div>
+      <div class="header-title" style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div>
+          <span class="kicker">FORENSIC ARTIFACT EXPORT</span>
+          <h1>Reports & Dossiers Export</h1>
+          <p>Generate court-admissible forensic intelligence dossiers in PDF, HTML, JSON, and CSV formats.</p>
+        </div>
+      </div>
+
+      <section class="panel panel-pad" style="margin-bottom:16px">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <span style="font-weight:700;font-size:13px">Export Current Case:</span>
+          <a id="export-pdf" href="#" class="btn primary sm">PDF Dossier</a>
+          <a id="export-html" href="#" class="btn secondary sm">HTML Report</a>
+          <a id="export-json" href="#" class="btn ghost sm">JSON Bundle</a>
+          <a id="export-csv" href="#" class="btn ghost sm">CSV Indicators</a>
         </div>
       </section>
 
-      <!-- Report Metrics & Table of Contents Split Grid -->
-      <div class="grid g3 section" style="grid-template-columns:1fr 2fr">
-        <!-- Table of Contents -->
-        <section class="panel">
-          <div class="section-title panel-pad">
-            <h2>Report Structure (10 Sections)</h2>
-            <span class="kicker">COMPREHENSIVE</span>
-          </div>
-          <div class="panel-pad" style="font-size:11px;color:#cbd5e1">
-            <div style="padding:6px 0;border-bottom:1px solid #1e293b">1. Executive Overview & Scope</div>
-            <div style="padding:6px 0;border-bottom:1px solid #1e293b">2. Web Evidence & Crawl Activity</div>
-            <div style="padding:6px 0;border-bottom:1px solid #1e293b">3. Technical Misconfigurations (4 Categories)</div>
-            <div style="padding:6px 0;border-bottom:1px solid #1e293b">4. OSINT Provider Verification</div>
-            <div style="padding:6px 0;border-bottom:1px solid #1e293b">5. AI Stylometry & Persona Analysis</div>
-            <div style="padding:6px 0;border-bottom:1px solid #1e293b">6. Connections & Entity Sightings</div>
-            <div style="padding:6px 0;border-bottom:1px solid #1e293b">7. Attribution Relationship Graph</div>
-            <div style="padding:6px 0;border-bottom:1px solid #1e293b">8. Chronological Event Timeline</div>
-            <div style="padding:6px 0;border-bottom:1px solid #1e293b">9. OPSEC Exposure & Confidence Scores</div>
-            <div style="padding:6px 0">10. Source Provenance Appendices</div>
-          </div>
-        </section>
-
-        <!-- Executive Metrics & Artifacts History Table -->
-        <section class="panel">
-          <div class="section-title panel-pad">
-            <h2>Persisted Report History & Generated Artifacts</h2>
-            <span class="kicker">CANONICAL STORE</span>
-          </div>
-          <div class="panel-pad">
-            <div class="grid g4" style="margin-bottom:14px">
-              <div class="metric-card">
-                <label>Total Findings</label>
-                <strong style="color:#38bdf8">9</strong>
-              </div>
-              <div class="metric-card">
-                <label>Connections</label>
-                <strong style="color:#a855f7">6</strong>
-              </div>
-              <div class="metric-card">
-                <label>Confidence</label>
-                <strong style="color:#10b981">0.85</strong>
-              </div>
-              <div class="metric-card">
-                <label>OPSEC Score</label>
-                <strong style="color:#ef4444">85/100</strong>
-              </div>
-            </div>
-
-            <div id="report-list"></div>
-          </div>
-        </section>
-      </div>
+      <section class="panel">
+        <div class="panel-head"><div><span class="kicker">ARCHIVED REPORTS</span><h2>Generated Dossiers</h2></div></div>
+        <div id="reports-list" class="panel-pad"></div>
+      </section>
     </main>
   </div>
   <script src="/web/app.js"></script>

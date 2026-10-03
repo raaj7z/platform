@@ -33,12 +33,15 @@ def resolve_path(value: str) -> str:
 # having both applications blindly write to the same SQLite database.
 #
 
-DB_PATH = resolve_path(
-    os.getenv(
-        "PRALAYX_DB_PATH",
-        "data/pralayx.db",
+if os.getenv("VERCEL"):
+    DB_PATH = "/tmp/pralayx.db"
+else:
+    DB_PATH = resolve_path(
+        os.getenv(
+            "PRALAYX_DB_PATH",
+            "data/pralayx.db",
+        )
     )
-)
 
 
 # ---------------------------------------------------------------------------
@@ -97,12 +100,16 @@ WEB_PATH = resolve_path(
 # Reports are never silently overwritten.
 #
 
-REPORTS_PATH = resolve_path(
-    os.getenv(
-        "PRALAYX_REPORTS_PATH",
-        "data/reports",
+if os.getenv("VERCEL"):
+    REPORTS_PATH = "/tmp/reports"
+    os.makedirs("/tmp/reports", exist_ok=True)
+else:
+    REPORTS_PATH = resolve_path(
+        os.getenv(
+            "PRALAYX_REPORTS_PATH",
+            "data/reports",
+        )
     )
-)
 
 
 # ---------------------------------------------------------------------------

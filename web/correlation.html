@@ -3,101 +3,66 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>PRALAYX -- Unified Relationship Graph</title>
+  <title>PRALAYX — Unified Relationship Graph Workstation</title>
   <link rel="stylesheet" href="/web/app.css">
 </head>
 <body>
   <div class="app">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="logo-mark">◒</div>
-        <div>
-          <div class="logo-name">PRALAY<em>X</em></div>
-          <span class="logo-sub">Dark Web Threat De-anonymization</span>
-        </div>
-      </div>
-      <nav class="nav">
-        <div class="nav-title">OPERATIONS</div>
-        <a data-page="dashboard" href="/web/index.html"><span class="nav-ico">⌂</span>Dashboard Overview</a>
-        <a data-page="crawl" href="/web/crawl.html"><span class="nav-ico">＋</span>New Crawl</a>
-        <a data-page="investigations" href="/web/investigations.html"><span class="nav-ico">⌕</span>Investigations Workspace</a>
-        <div class="nav-title">INTELLIGENCE</div>
-        <a data-page="correlation" href="/web/correlation.html"><span class="nav-ico">⌘</span>Relationship Graph</a>
-        <a data-page="osint" href="/web/osint.html"><span class="nav-ico">◎</span>OSINT & Misconfigurations</a>
-        <a data-page="analysis" href="/web/analysis.html"><span class="nav-ico">⌁</span>AI Stylometry / Persona</a>
-        <a data-page="reports" href="/web/reports.html"><span class="nav-ico">▤</span>Final Reports & Export</a>
-        <div class="nav-title">MONITORING</div>
-        <a data-page="monitoring" href="/web/monitoring.html"><span class="nav-ico">◉</span>Watchlist & Alerts</a>
-        <div class="nav-title">SYSTEM</div>
-        <a data-page="terminal" href="/web/terminal.html"><span class="nav-ico">›_</span>Terminal Log</a>
-        <a data-page="settings" href="/web/settings.html"><span class="nav-ico">⚙</span>Settings</a>
-      </nav>
-      <div class="sidebar-foot">
-        <button id="btn-toggle-theme" type="button" class="btn ghost" style="width:100%;margin-bottom:10px;font-size:11px;height:32px;display:flex;align-items:center;justify-content:center;gap:6px">☀️ Day Mode</button>
-        <div>PRALAYX v2.0 (SIH26151)<br>EVIDENCE · ENTITY · ATTRIBUTION</div>
-      </div>
-    </aside>
+    <aside class="sidebar"><!-- Nav rendered by app.js --></aside>
     <main class="main">
-      <header class="top">
-        <div>
-          <span class="kicker">ENTITY RESOLUTION & ATTRIBUTION</span>
-          <h1>Unified Relationship Graph</h1>
-        </div>
-        <span class="case-chip">EVIDENCE-BACKED</span>
-      </header>
+      <div id="investigation-context-root"></div>
 
-      <!-- Category Filter Controls & Search -->
-      <section class="panel panel-pad section" style="display:flex;justify-content:space-between;align-items:center;background:#0f172a;margin-bottom:16px">
+      <div class="header-title" style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div>
+          <span class="kicker">ENTITY RESOLUTION & ATTRIBUTION GRAPH</span>
+          <h1>Unified Relationship Graph Workstation</h1>
+          <p>Interactive force-directed attribution network correlating darknet personas, infrastructure, and cryptocurrency wallets.</p>
+        </div>
+        <div style="display:flex;gap:8px">
+          <span class="badge blue">Solid Edge = Observed</span>
+          <span class="badge amber">Dashed Edge = Analytical Lead</span>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <section class="panel panel-pad" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <span style="font-size:12px;font-weight:bold;color:#38bdf8">Select Case:</span>
-          <select id="graph-case-select" class="input" style="height:32px;font-size:11px;width:220px;padding:0 8px;border-color:#38bdf8"></select>
-          <span style="font-size:12px;font-weight:bold;color:#94a3b8;margin-left:8px">Filter Edges:</span>
-          <button class="btn graph-filter active" data-filter="all" style="height:32px;font-size:11px">All Edges</button>
-          <button class="btn ghost graph-filter" data-filter="technical" style="height:32px;font-size:11px">Technical</button>
-          <button class="btn ghost graph-filter" data-filter="entity" style="height:32px;font-size:11px">Entity</button>
-          <button class="btn ghost graph-filter" data-filter="persona" style="height:32px;font-size:11px">Persona Continuity</button>
+          <span style="font-size:12px;font-weight:700;color:var(--text-sub)">Select Case:</span>
+          <select id="graph-case-select" class="select" style="width:260px"></select>
+          <span style="font-size:12px;font-weight:700;color:var(--text-sub);margin-left:8px">Category:</span>
+          <button class="btn primary sm graph-filter" data-filter="all">All</button>
+          <button class="btn ghost sm graph-filter" data-filter="technical">Technical</button>
+          <button class="btn ghost sm graph-filter" data-filter="entity">Entity</button>
+          <button class="btn ghost sm graph-filter" data-filter="persona">Persona</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <button id="toggle-view-btn" class="btn ghost" style="height:32px;font-size:11px">📋 Toggle Table View</button>
-          <input id="graph-search-input" class="input" style="height:32px;font-size:11px;width:180px" placeholder="Search node name...">
+          <input id="graph-search-input" class="input" style="width:200px" placeholder="Filter node name...">
         </div>
       </section>
 
-      <!-- Graph & Selected Node Detail Split Grid -->
-      <div class="grid g3 section" style="grid-template-columns:2fr 1fr">
-        <!-- Relationship Graph Canvas -->
+      <!-- Graph & Details Split -->
+      <div class="grid g3" style="grid-template-columns:3fr 1.2fr;align-items:start">
         <section class="panel">
-          <div class="section-title panel-pad" style="display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <h2>Attribution Graph Canvas</h2>
-              <span class="kicker">INTERACTIVE NODE-LINK ATTRIBUTION MAP</span>
-            </div>
-            <div style="display:flex;gap:12px;font-size:11px;color:#94a3b8">
-              <span>🟢 Direct (Solid)</span>
-              <span>🔵 Inferred (Solid)</span>
-              <span>🟠 Persona (Dashed)</span>
+          <div class="panel-head">
+            <div><span class="kicker">ATTRIBUTION GRAPH CANVAS</span><h2>Interactive Node Network</h2></div>
+            <div style="display:flex;gap:12px;font-size:11px;color:var(--text-muted)">
+              <span>🔵 Target</span><span>🔴 Actor</span><span>🟢 Observables</span>
             </div>
           </div>
-          <div id="graph-container" class="panel-pad" style="position:relative;min-height:520px;background:#060d19;overflow:hidden;border-top:1px solid #1e293b;padding:0"></div>
+          <div id="graph-container" style="position:relative;min-height:560px;background:#060d19;border-radius:0 0 6px 6px;overflow:hidden"></div>
         </section>
 
-        <!-- Selected Node Details Panel -->
         <section class="panel">
-          <div class="section-title panel-pad">
-            <h2>Node Details</h2>
-            <span class="kicker">EVIDENCE INSPECTOR</span>
+          <div class="panel-head">
+            <div><span class="kicker">EVIDENCE INSPECTOR</span><h2>Entity Intelligence Details</h2></div>
           </div>
-          <div id="node-details-container" class="panel-pad" style="font-size:12px;color:#cbd5e1">
-            <div style="color:#94a3b8;font-style:italic">Click any node on the canvas to inspect evidence details and connected intelligence edges.</div>
+          <div id="node-details-container" class="panel-pad" style="font-size:12px">
+            <div style="color:var(--text-muted);font-style:italic">Click any node on the graph canvas to inspect evidence provenance, linked entities, and confidence scores.</div>
           </div>
         </section>
       </div>
     </main>
   </div>
-
-  <!-- In-page Popup Modal Container -->
-  <div id="node-modal-root"></div>
-
   <script src="/web/app.js"></script>
 </body>
 </html>

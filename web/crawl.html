@@ -1,1 +1,73 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PRALAYX -- New Crawl Task</title><link rel="stylesheet" href="/web/app.css"></head><body><div class="app"><aside class="sidebar"><div class="brand"><div class="logo-mark">◒</div><div><div class="logo-name">PRALAY<em>X</em></div><span class="logo-sub">Dark Web Threat De-anonymization</span></div></div><nav class="nav"><div class="nav-title">OPERATIONS</div><a data-page="dashboard" href="/web/index.html"><span class="nav-ico">⌂</span>Dashboard Overview</a><a data-page="crawl" href="/web/crawl.html"><span class="nav-ico">＋</span>New Crawl</a><a data-page="investigations" href="/web/investigations.html"><span class="nav-ico">⌕</span>Investigations Workspace</a><div class="nav-title">INTELLIGENCE</div><a data-page="correlation" href="/web/correlation.html"><span class="nav-ico">⌘</span>Relationship Graph</a><a data-page="osint" href="/web/osint.html"><span class="nav-ico">◎</span>OSINT & Misconfigurations</a><a data-page="analysis" href="/web/analysis.html"><span class="nav-ico">⌁</span>AI Stylometry / Persona</a><a data-page="reports" href="/web/reports.html"><span class="nav-ico">▤</span>Final Reports & Export</a><div class="nav-title">MONITORING</div><a data-page="monitoring" href="/web/monitoring.html"><span class="nav-ico">◉</span>Watchlist & Alerts</a><div class="nav-title">SYSTEM</div><a data-page="terminal" href="/web/terminal.html"><span class="nav-ico">›_</span>Terminal Log</a><a data-page="settings" href="/web/settings.html"><span class="nav-ico">⚙</span>Settings</a></nav><div class="sidebar-foot"><button id="btn-toggle-theme" type="button" class="btn ghost" style="width:100%;margin-bottom:10px;font-size:11px;height:32px;display:flex;align-items:center;justify-content:center;gap:6px">☀️ Day Mode</button><div>PRALAYX v2.0 (SIH26151)<br>EVIDENCE · ENTITY · ATTRIBUTION</div></div></aside><main class="main"><header class="top"><div><span class="kicker">COLLECTION / CRAWLER</span><h1>Dark-web collection</h1></div></header><section class="panel panel-pad"><div class="notice"><strong>Execution policy:</strong> collection events are retained against the investigation. The live terminal appears only while a job is running.</div><form id="crawl-form" class="grid g2 section"><label>Target URL<input class="input" id="crawl-url" type="url" placeholder="http://example.onion/..." required></label><label>Optional actor / username<input class="input" id="crawl-username" placeholder="username"></label><button class="btn">Start crawler session</button></form></section><section id="live-session" class="panel panel-pad section hidden"></section></main></div><script src="/web/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PRALAYX — Dark Web Target Collection</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar"><!-- Nav rendered by app.js --></aside>
+    <main class="main">
+      <div id="investigation-context-root"></div>
+
+      <div class="header-title" style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div>
+          <span class="kicker">DARK WEB COLLECTION ENGINE</span>
+          <h1>Dark Web Target Collection</h1>
+          <p>Collect raw HTML footprints, PGP keys, BTC wallets, contact emails, and server headers from Tor onion services.</p>
+        </div>
+        <span id="tor-status-badge" class="badge blue">CHECKING TOR...</span>
+      </div>
+
+      <!-- Launch Crawl Form -->
+      <section class="panel panel-pad" style="margin-bottom:16px">
+        <h3 style="margin:0 0 12px 0;font-size:14px">Launch Crawl Job</h3>
+        <form id="crawl-form" style="display:grid;grid-template-columns:2fr 1fr 120px 140px;gap:10px;align-items:end">
+          <div>
+            <label class="form-label">Target URL / Onion Service</label>
+            <input class="input" id="crawl-url" type="url" placeholder="http://xxxxxxxxxxxxxxxxxx.onion/..." required>
+          </div>
+          <div>
+            <label class="form-label">Target Handle / Alias</label>
+            <input class="input" id="crawl-username" placeholder="Optional alias">
+          </div>
+          <div>
+            <label class="form-label">Workers</label>
+            <input class="input" id="crawl-workers" type="number" value="2" min="1" max="10">
+          </div>
+          <button class="btn primary" type="submit" style="height:36px">+ Start Crawl</button>
+        </form>
+      </section>
+
+      <!-- Live Terminal Log -->
+      <section id="live-session" class="panel panel-pad hidden" style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3 style="margin:0;font-size:14px;color:var(--blue)">🕷 Crawl Session Live Output</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span id="crawl-status-badge" class="badge amber">RUNNING</span>
+            <span id="crawl-inv-badge" class="badge blue"></span>
+          </div>
+        </div>
+        <div id="crawl-terminal" class="terminal" style="min-height:280px">
+          <span class="terminal-line dim">Starting crawl session...</span>
+        </div>
+      </section>
+
+      <!-- Recent Crawl Sessions -->
+      <section class="panel">
+        <div class="panel-head">
+          <div><span class="kicker">CRAWL JOB HISTORY</span><h2>Recent Crawl Sessions</h2></div>
+          <span id="crawl-jobs-count" class="badge blue">LOADING...</span>
+        </div>
+        <div id="crawl-jobs-list" class="panel-pad">
+          <div class="skeleton skeleton-line wide"></div>
+          <div class="skeleton skeleton-line med"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/web/app.js"></script>
+</body>
+</html>

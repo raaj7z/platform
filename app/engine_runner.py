@@ -15,36 +15,62 @@ from typing import Any
 # ============================================================
 
 def load_engine():
-    """
-    Load the real osint-engine repository.
+    import importlib
+    import importlib.util
 
-    The platform does not copy or duplicate the engine.
-    """
-
-    root = os.getenv(
-        "OSINT_ENGINE_PATH",
-        "../osint-engine",
+    root = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "osint-engine")
     )
-
-    root = os.path.abspath(root)
-
     if not os.path.isdir(root):
-        raise RuntimeError(
-            f"OSINT engine directory not found: {root}"
-        )
+        raise RuntimeError(f"OSINT engine directory not found: {root}")
 
-    if root not in sys.path:
-        sys.path.insert(0, root)
+    if root in sys.path:
+        sys.path.remove(root)
+    sys.path.insert(0, root)
 
-    engine = importlib.import_module(
-        "src.engine"
-    )
+    if "src" in sys.modules:
+        src_mod = sys.modules["src"]
+        src_file = getattr(src_mod, "__file__", "") or ""
+        if root not in src_file:
+            for mod_name in list(sys.modules.keys()):
+                if mod_name == "src" or mod_name.startswith("src."):
+                    del sys.modules[mod_name]
 
-    models = importlib.import_module(
-        "src.models"
-    )
+    try:
+        engine = importlib.import_module("src.engine")
+        models = importlib.import_module("src.models")
+        return engine, models
+    except Exception:
+        models_path = os.path.join(root, "src", "models.py")
+        engine_path = os.path.join(root, "src", "engine.py")
 
-    return engine, models
+        spec_m = importlib.util.spec_from_file_location("src.models", models_path)
+        osint_models = importlib.util.module_from_spec(spec_m)
+        sys.modules["src.models"] = osint_models
+        spec_m.loader.exec_module(osint_models)
+
+        spec_e = importlib.util.spec_from_file_location("src.engine", engine_path)
+        osint_engine = importlib.util.module_from_spec(spec_e)
+        sys.modules["src.engine"] = osint_engine
+        spec_e.loader.exec_module(osint_engine)
+
+        return osint_engine, osint_models
+    except ModuleNotFoundError:
+        import importlib.util
+        models_path = os.path.join(root, "src", "models.py")
+        engine_path = os.path.join(root, "src", "engine.py")
+
+        spec_m = importlib.util.spec_from_file_location("src.models", models_path)
+        osint_models = importlib.util.module_from_spec(spec_m)
+        sys.modules["src.models"] = osint_models
+        spec_m.loader.exec_module(osint_models)
+
+        spec_e = importlib.util.spec_from_file_location("src.engine", engine_path)
+        osint_engine = importlib.util.module_from_spec(spec_e)
+        sys.modules["src.engine"] = osint_engine
+        spec_e.loader.exec_module(osint_engine)
+
+        return osint_engine, osint_models
 
 
 # ============================================================
@@ -541,8 +567,16 @@ def _execute_engine(
         run_id=run_id,
     )
 
+    def _engine_event_sink(ev):
+        try:
+            comp = ev.get("component") or "OSINT"
+            msg = ev.get("message") or f"{comp}: {ev.get('status', 'running')}"
+            _event(db, job_id, "status", f"[{comp}] {msg}", payload=ev, run_id=run_id)
+        except Exception:
+            pass
+
     engine = (
-        engine_module.OSINTEngine()
+        engine_module.OSINTEngine(db=db, event_sink=_engine_event_sink)
     )
 
     # --------------------------------------------------------

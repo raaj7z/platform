@@ -3,88 +3,45 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>PRALAYX -- AI Stylometry & Persona Analysis</title>
+  <title>PRALAYX — Stylometric Analysis</title>
   <link rel="stylesheet" href="/web/app.css">
 </head>
 <body>
   <div class="app">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="logo-mark">◒</div>
-        <div>
-          <div class="logo-name">PRALAY<em>X</em></div>
-          <span class="logo-sub">Dark Web Threat De-anonymization</span>
-        </div>
-      </div>
-      <nav class="nav">
-        <div class="nav-title">OPERATIONS</div>
-        <a data-page="dashboard" href="/web/index.html"><span class="nav-ico">⌂</span>Dashboard Overview</a>
-        <a data-page="crawl" href="/web/crawl.html"><span class="nav-ico">＋</span>New Crawl</a>
-        <a data-page="investigations" href="/web/investigations.html"><span class="nav-ico">⌕</span>Investigations Workspace</a>
-        <div class="nav-title">INTELLIGENCE</div>
-        <a data-page="correlation" href="/web/correlation.html"><span class="nav-ico">⌘</span>Relationship Graph</a>
-        <a data-page="osint" href="/web/osint.html"><span class="nav-ico">◎</span>OSINT & Misconfigurations</a>
-        <a data-page="analysis" href="/web/analysis.html"><span class="nav-ico">⌁</span>AI Stylometry / Persona</a>
-        <a data-page="reports" href="/web/reports.html"><span class="nav-ico">▤</span>Final Reports & Export</a>
-        <div class="nav-title">MONITORING</div>
-        <a data-page="monitoring" href="/web/monitoring.html"><span class="nav-ico">◉</span>Watchlist & Alerts</a>
-        <div class="nav-title">SYSTEM</div>
-        <a data-page="terminal" href="/web/terminal.html"><span class="nav-ico">›_</span>Terminal Log</a>
-        <a data-page="settings" href="/web/settings.html"><span class="nav-ico">⚙</span>Settings</a>
-      </nav>
-      <div class="sidebar-foot">
-        <button id="btn-toggle-theme" type="button" class="btn ghost" style="width:100%;margin-bottom:10px;font-size:11px;height:32px;display:flex;align-items:center;justify-content:center;gap:6px">☀️ Day Mode</button>
-        <div>PRALAYX v2.0 (SIH26151)<br>EVIDENCE · ENTITY · ATTRIBUTION</div>
-      </div>
-    </aside>
+    <aside class="sidebar"><!-- Nav rendered by app.js --></aside>
     <main class="main">
-      <header class="top">
-        <div>
-          <span class="kicker">PERSONA / STYLOMETRY / REBRAND CONTINUITY</span>
-          <h1>AI Stylometry & Persona Analysis</h1>
-        </div>
-        <span class="case-chip">AI MODEL ENGINE ACTIVE</span>
-      </header>
+      <div id="investigation-context-root"></div>
 
-      <!-- Synthetic Candidate Pseudonymous Continuity Container -->
-      <section class="panel panel-pad section" style="margin-bottom:16px">
-        <div id="persona-demo-container"></div>
+      <div class="header-title" style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div>
+          <span class="kicker">BEHAVIORAL PROFILING</span>
+          <h1>Stylometric & Diurnal Analysis</h1>
+          <p>Extract forensic linguistic features and temporal activity patterns from dark web communications.</p>
+        </div>
+        <a href="/web/stylometry.html" class="btn primary sm">Compare Personas ➔</a>
+      </div>
+
+      <!-- Diurnal Activity Heatmap -->
+      <section class="panel" style="margin-bottom:16px">
+        <div class="panel-head">
+          <div><span class="kicker">TEMPORAL FOOTPRINT</span><h2>24x7 Activity Heatmap</h2></div>
+          <span class="badge blue">HOURLY DISTRIBUTION</span>
+        </div>
+        <div class="panel-pad">
+          <div id="diurnal-heatmap"></div>
+        </div>
       </section>
 
-      <!-- Model Pipeline & Analyzed Samples Split Grid -->
-      <div class="grid g3 section">
-        <div class="panel panel-pad">
-          <span class="kicker" style="color:#38bdf8">1. STYLOMETRIC SIGNALS</span>
-          <h3 style="margin:4px 0 8px 0;color:#f8fafc">Feature Extraction Pipeline</h3>
-          <p class="muted" style="margin:0 0 10px 0">Extracts char 3-grams, lexical diversity (Type-Token Ratio), punctuation density, function word frequency, sentence length standard deviation, and emoji/capitalization ratios.</p>
-          <div style="font-size:10px;background:#0f172a;padding:8px;border-radius:4px">
-            <div>Char n-gram Sim: <strong>0.84</strong></div>
-            <div>Type-Token Ratio: <strong>0.62</strong></div>
-            <div>Function Word Overlap: <strong>0.79</strong></div>
-          </div>
+      <!-- Linguistic Profile Section -->
+      <section class="panel">
+        <div class="panel-head">
+          <div><span class="kicker">LINGUISTIC FINGERPRINT</span><h2>Stylometric Indicators</h2></div>
         </div>
-
-        <div class="panel panel-pad">
-          <span class="kicker" style="color:#a855f7">2. SEMANTIC EMBEDDINGS</span>
-          <h3 style="margin:4px 0 8px 0;color:#f8fafc">Cosine Similarity Distance</h3>
-          <p class="muted" style="margin:0 0 10px 0">Uses sentence-transformers (all-MiniLM-L6-v2) for semantic topic & stylistic alignment. Generates centroid vectors across sample corpora.</p>
-          <div style="font-size:10px;background:#0f172a;padding:8px;border-radius:4px">
-            <div>Semantic Cosine Sim: <strong>0.78</strong></div>
-            <div>Centroid Distance: <strong>0.22</strong></div>
-            <div>Topic Alignment: <strong>Hacking / Custom Proxy</strong></div>
-          </div>
+        <div id="analysis-profile-content" class="panel-pad">
+          <div class="skeleton skeleton-line wide"></div>
+          <div class="skeleton skeleton-line med"></div>
         </div>
-
-        <div class="panel panel-pad">
-          <span class="kicker" style="color:#f59e0b">3. SAFETY & BOUNDARIES</span>
-          <h3 style="margin:4px 0 8px 0;color:#f8fafc">Candidate Continuity Only</h3>
-          <p class="muted" style="margin:0 0 10px 0">Stylometric similarity suggests candidate handle continuity across rebranding. It does NOT prove a natural person's identity or produce real-world names.</p>
-          <div style="font-size:10px;background:#0f172a;padding:8px;border-radius:4px;color:#f59e0b">
-            <div>Wording: <strong>Candidate Pseudonymous Link</strong></div>
-            <div>Status: <strong>Needs Analyst Review</strong></div>
-          </div>
-        </div>
-      </div>
+      </section>
     </main>
   </div>
   <script src="/web/app.js"></script>

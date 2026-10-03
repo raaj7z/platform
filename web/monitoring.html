@@ -3,87 +3,34 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>PRALAYX -- Watchlist & Alerts</title>
+  <title>PRALAYX — Continuous Monitoring & Alerts</title>
   <link rel="stylesheet" href="/web/app.css">
 </head>
 <body>
   <div class="app">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="logo-mark">◒</div>
-        <div>
-          <div class="logo-name">PRALAY<em>X</em></div>
-          <span class="logo-sub">Dark Web Threat De-anonymization</span>
-        </div>
-      </div>
-      <nav class="nav">
-        <div class="nav-title">OPERATIONS</div>
-        <a data-page="dashboard" href="/web/index.html"><span class="nav-ico">⌂</span>Dashboard Overview</a>
-        <a data-page="crawl" href="/web/crawl.html"><span class="nav-ico">＋</span>New Crawl</a>
-        <a data-page="investigations" href="/web/investigations.html"><span class="nav-ico">⌕</span>Investigations Workspace</a>
-        <div class="nav-title">INTELLIGENCE</div>
-        <a data-page="correlation" href="/web/correlation.html"><span class="nav-ico">⌘</span>Relationship Graph</a>
-        <a data-page="osint" href="/web/osint.html"><span class="nav-ico">◎</span>OSINT & Misconfigurations</a>
-        <a data-page="analysis" href="/web/analysis.html"><span class="nav-ico">⌁</span>AI Stylometry / Persona</a>
-        <a data-page="reports" href="/web/reports.html"><span class="nav-ico">▤</span>Final Reports & Export</a>
-        <div class="nav-title">MONITORING</div>
-        <a data-page="monitoring" href="/web/monitoring.html"><span class="nav-ico">◉</span>Watchlist & Alerts</a>
-        <div class="nav-title">SYSTEM</div>
-        <a data-page="terminal" href="/web/terminal.html"><span class="nav-ico">›_</span>Terminal Log</a>
-        <a data-page="settings" href="/web/settings.html"><span class="nav-ico">⚙</span>Settings</a>
-      </nav>
-      <div class="sidebar-foot">
-        <button id="btn-toggle-theme" type="button" class="btn ghost" style="width:100%;margin-bottom:10px;font-size:11px;height:32px;display:flex;align-items:center;justify-content:center;gap:6px">☀️ Day Mode</button>
-        <div>PRALAYX v2.0 (SIH26151)<br>EVIDENCE · ENTITY · ATTRIBUTION</div>
-      </div>
-    </aside>
+    <aside class="sidebar"><!-- Nav rendered by app.js --></aside>
     <main class="main">
-      <header class="top">
+      <div id="investigation-context-root"></div>
+
+      <div class="header-title" style="display:flex;justify-content:space-between;align-items:flex-end">
         <div>
-          <span class="kicker">MONITORING & ALERTS</span>
-          <h1>Watchlist & In-App Alerts</h1>
+          <span class="kicker">PERSISTENT SURVEILLANCE</span>
+          <h1>Monitoring Watchlist & Real-Time Alerts</h1>
+          <p>Automated periodic surveillance of target onion services and real-time alerts on OpSec modifications.</p>
         </div>
-        <span class="case-chip">SCHEDULER ACTIVE</span>
-      </header>
-
-      <!-- Watchlist & Alerts Split Grid -->
-      <div class="grid g2 section">
-        <!-- Watchlist Panel -->
-        <section class="panel">
-          <div class="section-title panel-pad">
-            <h2>Scheduled Watchlist Entries</h2>
-            <span class="kicker">AUTOMATED RE-SCAN</span>
-          </div>
-          <div class="panel-pad">
-            <div id="watchlist"></div>
-          </div>
-        </section>
-
-        <!-- System Alerts Panel -->
-        <section class="panel">
-          <div class="section-title panel-pad">
-            <h2>In-App Alerts Log</h2>
-            <span class="kicker">HIGH-PRIORITY EVENTS</span>
-          </div>
-          <div class="panel-pad">
-            <div id="alerts"></div>
-          </div>
-        </section>
+        <button id="btn-add-watch" class="btn primary">+ Add Watch Target</button>
       </div>
 
-      <!-- Email Notifications Config -->
-      <section class="panel panel-pad section" style="margin-top:16px;background:#0f172a">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <h3 style="margin:0 0 4px 0;color:#f8fafc">Email Notifications Configuration</h3>
-            <p class="muted" style="margin:0">Send email notifications for RED / High-priority alerts only. Delivery status logged in PRALAYX database.</p>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <span class="status COMPLETED">SMTP CONFIGURED</span>
-            <button class="btn ghost" style="height:30px;font-size:10px">Configure SMTP</button>
-          </div>
-        </div>
-      </section>
+      <div class="grid g2">
+        <section class="panel">
+          <div class="panel-head"><div><span class="kicker">WATCHLIST</span><h2>Monitored Darknet Targets</h2></div></div>
+          <div id="monitoring-list" class="panel-pad"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><div><span class="kicker">SECURITY TRIGGERS</span><h2>Live Alerts Stream</h2></div></div>
+          <div id="alerts-list" class="panel-pad"></div>
+        </section>
+      </div>
     </main>
   </div>
   <script src="/web/app.js"></script>

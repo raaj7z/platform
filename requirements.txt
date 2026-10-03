@@ -1,5 +1,17 @@
-fastapi
-uvicorn[standard]
-pydantic>=2.7,<3
-python-dotenv
-reportlab
+# Core Web Framework & Server
+fastapi>=0.115.0,<1.0.0
+uvicorn[standard]>=0.30.0,<1.0.0
+pydantic>=2.7.0,<3.0.0
+python-dotenv>=1.0.1,<2.0.0
+
+# Dark Web & HTTP Networking
+requests>=2.31.0,<3.0.0
+PySocks>=1.7.1,<2.0.0
+beautifulsoup4>=4.12.2,<5.0.0
+cryptography>=42.0.0,<46.0.0
+
+# Task Scheduling & Intelligence Engine
+APScheduler>=3.10.4,<4.0.0
+
+# Forensics & PDF Report Generation
+reportlab>=4.0.0,<5.0.0

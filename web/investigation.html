@@ -3,104 +3,143 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>PRALAYX -- Investigation Workspace</title>
+  <title>PRALAYX — Investigation Workspace</title>
   <link rel="stylesheet" href="/web/app.css">
 </head>
 <body>
   <div class="app">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="logo-mark">◒</div>
-        <div>
-          <div class="logo-name">PRALAY<em>X</em></div>
-          <span class="logo-sub">Dark Web Threat De-anonymization</span>
-        </div>
-      </div>
-      <nav class="nav">
-        <div class="nav-title">OPERATIONS</div>
-        <a data-page="dashboard" href="/web/index.html"><span class="nav-ico">⌂</span>Dashboard Overview</a>
-        <a data-page="crawl" href="/web/crawl.html"><span class="nav-ico">＋</span>New Crawl</a>
-        <a data-page="investigations" href="/web/investigations.html"><span class="nav-ico">⌕</span>Investigations Workspace</a>
-        <div class="nav-title">INTELLIGENCE</div>
-        <a data-page="correlation" href="/web/correlation.html"><span class="nav-ico">⌘</span>Relationship Graph</a>
-        <a data-page="osint" href="/web/osint.html"><span class="nav-ico">◎</span>OSINT & Misconfigurations</a>
-        <a data-page="analysis" href="/web/analysis.html"><span class="nav-ico">⌁</span>AI Stylometry / Persona</a>
-        <a data-page="reports" href="/web/reports.html"><span class="nav-ico">▤</span>Final Reports & Export</a>
-        <div class="nav-title">MONITORING</div>
-        <a data-page="monitoring" href="/web/monitoring.html"><span class="nav-ico">◉</span>Watchlist & Alerts</a>
-        <div class="nav-title">SYSTEM</div>
-        <a data-page="terminal" href="/web/terminal.html"><span class="nav-ico">›_</span>Terminal Log</a>
-        <a data-page="settings" href="/web/settings.html"><span class="nav-ico">⚙</span>Settings</a>
-      </nav>
-      <div class="sidebar-foot">
-        <button id="btn-toggle-theme" type="button" class="btn ghost" style="width:100%;margin-bottom:10px;font-size:11px;height:32px;display:flex;align-items:center;justify-content:center;gap:6px">☀️ Day Mode</button>
-        <div>PRALAYX v2.0 (SIH26151)<br>EVIDENCE · ENTITY · ATTRIBUTION</div>
-      </div>
-    </aside>
+    <aside class="sidebar"><!-- Nav rendered by app.js --></aside>
     <main class="main">
-      <header class="top">
+      <div id="investigation-context-root"></div>
+
+      <!-- Case Header -->
+      <div class="header-title" style="display:flex;justify-content:space-between;align-items:flex-end">
         <div>
-          <span class="kicker">OPERATIONS / INVESTIGATION WORKSPACE</span>
-          <h1 id="case-title">INV-DEMO-2026 -- http://darkmarket-v2.onion</h1>
+          <span class="kicker">THREAT ACTOR DE-ANONYMIZATION WORKSPACE</span>
+          <h1 id="case-title">Investigation Workspace</h1>
+          <p id="case-target-desc">Comprehensive forensic intelligence record, entity correlation, and threat attribution dossier.</p>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <span class="tag red" style="background:#7f1d1d22;color:#f87171">Cyber Crime</span>
-          <span class="status COMPLETED">IN PROGRESS</span>
-          <button id="run-module-btn" class="btn" style="height:28px;font-size:10px">+ Run Module</button>
+          <span id="case-status-badge" class="badge blue">LOADING</span>
+          <a id="case-export-btn" href="#" class="btn primary sm">Export PDF Dossier</a>
         </div>
-      </header>
-
-      <!-- Case Summary Banner & Quick Stats -->
-      <div id="case-summary" class="grid g4 section" style="margin-bottom:16px"></div>
-      <div id="case-error" class="notice section hidden"></div>
-
-      <!-- Quick Action Toolbar -->
-      <section class="panel panel-pad section" style="display:flex;justify-content:space-between;align-items:center;background:#0f172a;margin-bottom:16px">
-        <div style="display:flex;gap:10px;align-items:center">
-          <span style="font-size:11px;font-weight:bold;color:#94a3b8">Module Controls:</span>
-          <button class="btn ghost" onclick="triggerModuleRun('crawl')">▶ Crawl Target</button>
-          <button class="btn ghost" onclick="triggerModuleRun('osint')">▶ OSINT Enrich</button>
-          <button class="btn ghost" onclick="triggerModuleRun('persona')">▶ AI Stylometry</button>
-          <button class="btn ghost" onclick="triggerModuleRun('correlate')">▶ Refresh Graph</button>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <span style="font-size:11px;font-weight:bold;color:#94a3b8">Export Report:</span>
-          <a href="/api/export/INV-DEMO-2026/pdf" class="btn" style="background:#dc2626;border:0;height:28px;padding:0 10px;font-size:10px;display:grid;place-items:center;text-decoration:none">PDF</a>
-          <a href="/api/export/INV-DEMO-2026/html" class="btn" style="background:#2563eb;border:0;height:28px;padding:0 10px;font-size:10px;display:grid;place-items:center;text-decoration:none">HTML</a>
-          <a href="/api/export/INV-DEMO-2026/json" class="btn" style="background:#059669;border:0;height:28px;padding:0 10px;font-size:10px;display:grid;place-items:center;text-decoration:none">JSON</a>
-          <a href="/api/export/INV-DEMO-2026/csv" class="btn" style="background:#7c3aed;border:0;height:28px;padding:0 10px;font-size:10px;display:grid;place-items:center;text-decoration:none">CSV</a>
-        </div>
-      </section>
-
-      <!-- Sub-view Navigation Tabs -->
-      <div class="tabs section" style="margin-bottom:14px">
-        <a class="active" href="#">Summary & Findings</a>
-        <a href="/web/correlation.html?id=INV-DEMO-2026">Relationship Graph</a>
-        <a href="/web/osint.html?id=INV-DEMO-2026">Misconfigurations & OSINT</a>
-        <a href="/web/analysis.html">AI Stylometry & Persona</a>
-        <a href="/web/reports.html">Reports & Exports</a>
       </div>
 
-      <!-- Findings List & Timeline Split View -->
-      <div class="grid g2 section">
-        <section class="panel">
-          <div class="section-title panel-pad">
-            <h2>Latest Findings & Evidence Leads</h2>
-            <span class="kicker">SOURCE-BACKED</span>
-          </div>
-          <div id="case-findings" style="padding:10px"></div>
-        </section>
+      <!-- Metric Summary Bar -->
+      <section id="case-summary" class="grid g4" style="margin-bottom:16px"></section>
 
+      <!-- Workspace In-Page Tabs -->
+      <div class="workspace-tabs" id="case-workspace-tabs">
+        <button class="workspace-tab active" data-tab="overview">OVERVIEW</button>
+        <button class="workspace-tab" data-tab="findings">FINDINGS</button>
+        <button class="workspace-tab" data-tab="osint">OSINT</button>
+        <button class="workspace-tab" data-tab="persona">PERSONA</button>
+        <button class="workspace-tab" data-tab="graph">GRAPH</button>
+        <button class="workspace-tab" data-tab="timeline">TIMELINE</button>
+        <button class="workspace-tab" data-tab="evidence">EVIDENCE</button>
+        <button class="workspace-tab" data-tab="monitoring">MONITORING</button>
+        <button class="workspace-tab" data-tab="reports">REPORTS</button>
+      </div>
+
+      <!-- TAB 1: OVERVIEW -->
+      <div id="pane-overview" class="tab-pane active">
+        <div class="grid g2" style="margin-bottom:16px">
+          <section class="panel">
+            <div class="panel-head"><div><span class="kicker">CORE FINDINGS</span><h2>Key Indicators</h2></div></div>
+            <div id="overview-findings" class="panel-pad"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><div><span class="kicker">CHRONOLOGY</span><h2>Recent Events</h2></div></div>
+            <div id="case-timeline" class="panel-pad"></div>
+          </section>
+        </div>
+      </div>
+
+      <!-- TAB 2: FINDINGS -->
+      <div id="pane-findings" class="tab-pane">
         <section class="panel">
-          <div class="section-title panel-pad">
-            <h2>Investigation Timeline</h2>
-            <span class="kicker">AUDIT TRAIL</span>
+          <div class="panel-head"><div><span class="kicker">ALL CORRELATED EVIDENCE</span><h2>Extracted Indicators</h2></div></div>
+          <div class="table-container">
+            <table class="table">
+              <thead><tr><th>Type</th><th>Observable Value</th><th>Source URL</th><th>Confidence</th><th>Seen</th></tr></thead>
+              <tbody id="case-findings-tbody"></tbody>
+            </table>
           </div>
-          <div id="case-timeline" style="padding:10px"></div>
         </section>
       </div>
 
-      <section id="live-session" class="panel panel-pad section hidden" style="margin-top:16px"></section>
+      <!-- TAB 3: OSINT -->
+      <div id="pane-osint" class="tab-pane">
+        <section class="panel panel-pad" style="margin-bottom:16px">
+          <h3 style="margin:0 0 10px 0;font-size:14px">Run OSINT for this Case</h3>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input class="input" id="case-osint-target" placeholder="Target observable (domain, handle, IP, wallet)" style="flex:1">
+            <select class="select" id="case-osint-type" style="width:160px">
+              <option value="username">Handle</option><option value="domain">Domain</option><option value="ip">IP</option><option value="crypto">Crypto</option>
+            </select>
+            <button class="btn primary" id="btn-run-case-osint">Run OSINT</button>
+          </div>
+        </section>
+        <div id="case-osint-results" class="panel panel-pad"></div>
+      </div>
+
+      <!-- TAB 4: PERSONA -->
+      <div id="pane-persona" class="tab-pane">
+        <section class="panel panel-pad">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div><span class="kicker">AI BEHAVIORAL PROFILE</span><h3 style="margin:0">Persona Analysis</h3></div>
+            <a id="persona-compare-link" href="#" class="btn primary sm">Open Full Comparison ➔</a>
+          </div>
+          <div id="case-persona-content"></div>
+        </section>
+      </div>
+
+      <!-- TAB 5: GRAPH -->
+      <div id="pane-graph" class="tab-pane">
+        <section class="panel">
+          <div class="panel-head"><div><span class="kicker">CORRELATION WORKSTATION</span><h2>Case Attribution Graph</h2></div></div>
+          <div id="case-graph-container" style="min-height:500px;background:#060d19;position:relative"></div>
+          <div id="case-node-details" class="panel-pad"></div>
+        </section>
+      </div>
+
+      <!-- TAB 6: TIMELINE -->
+      <div id="pane-timeline" class="tab-pane">
+        <section class="panel">
+          <div class="panel-head"><div><span class="kicker">CHRONOLOGY</span><h2>Full Case Timeline</h2></div></div>
+          <div id="case-timeline-full" class="panel-pad"></div>
+        </section>
+      </div>
+
+      <!-- TAB 7: EVIDENCE -->
+      <div id="pane-evidence" class="tab-pane">
+        <section class="panel">
+          <div class="panel-head"><div><span class="kicker">FORENSIC ARTIFACTS</span><h2>Cryptographic Evidence Vault</h2></div></div>
+          <div id="case-evidence-vault" class="panel-pad"></div>
+        </section>
+      </div>
+
+      <!-- TAB 8: MONITORING -->
+      <div id="pane-monitoring" class="tab-pane">
+        <section class="panel">
+          <div class="panel-head"><div><span class="kicker">ACTIVE WATCHLIST</span><h2>Target Surveillance</h2></div></div>
+          <div id="case-monitoring-content" class="panel-pad"></div>
+        </section>
+      </div>
+
+      <!-- TAB 9: REPORTS -->
+      <div id="pane-reports" class="tab-pane">
+        <section class="panel panel-pad">
+          <span class="kicker">EXPORT FORENSIC DOSSIER</span>
+          <h3 style="margin:6px 0 12px 0">Download Investigation Artifacts</h3>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <a id="rpt-pdf-btn" href="#" class="btn primary">Download PDF</a>
+            <a id="rpt-html-btn" href="#" class="btn secondary">HTML Report</a>
+            <a id="rpt-json-btn" href="#" class="btn ghost">JSON Data</a>
+            <a id="rpt-csv-btn" href="#" class="btn ghost">CSV Indicators</a>
+          </div>
+        </section>
+      </div>
     </main>
   </div>
   <script src="/web/app.js"></script>

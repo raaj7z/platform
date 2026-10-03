@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PRALAYX — Threat Actors Registry</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar"><!-- Nav rendered by app.js --></aside>
+    <main class="main">
+      <div id="investigation-context-root"></div>
+
+      <div class="header-title" style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div>
+          <span class="kicker">ATTRIBUTION PROFILES</span>
+          <h1>Threat Actors Registry</h1>
+          <p>Tracked threat actor entities, darknet aliases, PGP fingerprints, and attributed infrastructure.</p>
+        </div>
+        <span id="actor-count-text" class="badge blue">LOADING...</span>
+      </div>
+
+      <section class="panel panel-pad" style="margin-bottom:16px">
+        <input id="actor-search-input" class="input" style="width:100%" placeholder="Filter threat actors by handle, alias, or PGP key...">
+      </section>
+
+      <section class="panel">
+        <div class="table-container">
+          <table class="table">
+            <thead><tr><th>Actor ID</th><th>Primary Alias</th><th>Observed Handles</th><th>Crypto Wallets</th><th>First Seen</th><th>Actions</th></tr></thead>
+            <tbody id="threat-actors-tbody">
+              <tr><td colspan="6"><div class="skeleton skeleton-line wide"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/web/app.js"></script>
+</body>
+</html>

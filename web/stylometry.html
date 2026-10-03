@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PRALAYX — Persona Comparison</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar"><!-- Nav rendered by app.js --></aside>
+    <main class="main">
+      <div id="investigation-context-root"></div>
+
+      <div class="header-title" style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div>
+          <span class="kicker">BEHAVIORAL ATTRIBUTION & STYLOMETRY</span>
+          <h1>Persona Comparison Workstation</h1>
+          <p>Compare writing styles, vocabulary distribution, and Hinglish code-switching between reference and candidate texts.</p>
+        </div>
+        <span class="badge blue">NLP ENGINE READY</span>
+      </div>
+
+      <!-- Comparison Inputs -->
+      <div class="grid g2" style="margin-bottom:16px">
+        <section class="panel panel-pad">
+          <h3 style="margin:0 0 8px 0;font-size:14px">Reference Persona / Text Sample A</h3>
+          <textarea id="persona-text-a" class="input" style="height:140px;width:100%;font-family:monospace;font-size:12px;resize:vertical" placeholder="Enter reference forum post, vendor profile, or message sample..."></textarea>
+        </section>
+        <section class="panel panel-pad">
+          <h3 style="margin:0 0 8px 0;font-size:14px">Candidate Persona / Text Sample B</h3>
+          <textarea id="persona-text-b" class="input" style="height:140px;width:100%;font-family:monospace;font-size:12px;resize:vertical" placeholder="Enter candidate post, darknet alias text, or clearnet sample..."></textarea>
+        </section>
+      </div>
+
+      <div style="display:flex;justify-content:center;margin-bottom:16px">
+        <button id="btn-compare-personas" class="btn primary" style="padding:10px 32px;font-size:14px">⚡ Execute Stylometric Comparison</button>
+      </div>
+
+      <!-- Results Holder -->
+      <section id="persona-compare-results" class="panel panel-pad hidden"></section>
+    </main>
+  </div>
+  <script src="/web/app.js"></script>
+</body>
+</html>

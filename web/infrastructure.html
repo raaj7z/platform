@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PRALAYX — Infrastructure & OpSec Leaks</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar"><!-- Nav rendered by app.js --></aside>
+    <main class="main">
+      <div id="investigation-context-root"></div>
+
+      <div class="header-title" style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div>
+          <span class="kicker">TECHNICAL MISCONFIGURATIONS</span>
+          <h1>Infrastructure & OpSec De-Anonymization</h1>
+          <p>Correlate darknet onion services with clearnet servers via TLS certificate hashes, JARM fingerprints, and server timezone leaks.</p>
+        </div>
+        <span class="badge blue">OPSEC CORRELATOR ACTIVE</span>
+      </div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div><span class="kicker">TECHNICAL EVIDENCE</span><h2>Infrastructure Leaks</h2></div>
+        </div>
+        <div id="infra-content" class="panel-pad">
+          <div class="skeleton skeleton-line wide"></div>
+          <div class="skeleton skeleton-line med"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/web/app.js"></script>
+</body>
+</html>

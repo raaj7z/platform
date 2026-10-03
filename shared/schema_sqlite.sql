@@ -751,31 +751,62 @@ CREATE INDEX IF NOT EXISTS idx_sih_reports_created
 
 
 -- ============================================================
+-- OBSERVATIONS (COMPATIBILITY LAYER)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS sih_observations (
+    observation_id TEXT PRIMARY KEY,
+    investigation_id TEXT NOT NULL,
+    actor_id TEXT,
+    source TEXT,
+    entity_type TEXT,
+    value TEXT,
+    metadata TEXT,
+    observed_at TEXT NOT NULL,
+
+    FOREIGN KEY (investigation_id)
+        REFERENCES sih_investigations(investigation_id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_sih_obs_inv
+    ON sih_observations(investigation_id);
+
+
+-- ============================================================
 -- WATCHLIST
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS sih_watchlist (
     watch_id TEXT PRIMARY KEY,
 
-    actor_id TEXT NOT NULL,
+    actor_id TEXT,
+    target TEXT NOT NULL,
+    investigation_id TEXT,
 
     interval_minutes INTEGER DEFAULT 60,
 
     enabled INTEGER DEFAULT 1,
+    status TEXT DEFAULT 'IDLE',
 
     last_scan_at TEXT,
+    next_scan_at TEXT,
+    last_change_at TEXT,
 
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
 
     FOREIGN KEY (actor_id)
         REFERENCES sih_actors(actor_id)
-        ON DELETE CASCADE
+        ON DELETE SET NULL
 );
 
 
 CREATE INDEX IF NOT EXISTS idx_sih_watchlist_actor
     ON sih_watchlist(actor_id);
+
+CREATE INDEX IF NOT EXISTS idx_sih_watchlist_target
+    ON sih_watchlist(target);
 
 CREATE INDEX IF NOT EXISTS idx_sih_watchlist_enabled
     ON sih_watchlist(enabled);
@@ -788,18 +819,26 @@ CREATE INDEX IF NOT EXISTS idx_sih_watchlist_enabled
 CREATE TABLE IF NOT EXISTS sih_alerts (
     alert_id TEXT PRIMARY KEY,
 
+    investigation_id TEXT,
     actor_id TEXT,
     finding_id TEXT,
 
-    alert_type TEXT,
+    source TEXT,
+    alert_type TEXT NOT NULL,
+    severity TEXT DEFAULT 'medium',
 
-    message TEXT,
+    message TEXT NOT NULL,
 
     confidence REAL,
 
+    status TEXT DEFAULT 'NEW',
     is_read INTEGER DEFAULT 0,
 
     created_at TEXT NOT NULL,
+
+    FOREIGN KEY (investigation_id)
+        REFERENCES sih_investigations(investigation_id)
+        ON DELETE CASCADE,
 
     FOREIGN KEY (actor_id)
         REFERENCES sih_actors(actor_id)
@@ -810,6 +849,9 @@ CREATE TABLE IF NOT EXISTS sih_alerts (
         ON DELETE SET NULL
 );
 
+
+CREATE INDEX IF NOT EXISTS idx_sih_alerts_inv
+    ON sih_alerts(investigation_id);
 
 CREATE INDEX IF NOT EXISTS idx_sih_alerts_actor
     ON sih_alerts(actor_id);

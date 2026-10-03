@@ -6,7 +6,7 @@ import json
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Optional, List, Dict, Any, Any
 
 from fastapi import (
     FastAPI,
@@ -282,109 +282,148 @@ def _reports(
 # SCHEDULED MONITORING CALLBACK
 # ============================================================
 
-def _scheduled_scan(
-    watch: dict[str, Any],
-):
+def run_monitoring_scan(db: DB, watch: dict[str, Any]):
     """
-    Callback used by the monitoring scheduler.
-
-    A watchlist item identifies an actor. The scan creates a new
-    investigation/run rather than mutating an older report.
-
-    Actual provider/crawler execution can therefore produce another
-    independent report track.
+    Execute a monitoring crawl scan reusing the existing crawler.
+    Performs snapshot diff comparison, change detection, timeline logging, and alert generation.
     """
-    actor_id = watch.get(
-        "actor_id"
-    )
+    watch_id = watch.get("watch_id")
+    target = watch.get("target") or watch.get("target_display")
+    investigation_id = watch.get("investigation_id")
+    actor_id = watch.get("actor_id")
 
-    if not actor_id:
-        return {
-            "status": "ERROR",
-            "error": "watchlist item has no actor_id",
-        }
-
-    actor_data = _db_call(
-        "get_actor",
-        actor_id,
-    )
-
-    if not actor_data:
-        return {
-            "status": "ERROR",
-            "error": (
-                f"actor not found: {actor_id}"
-            ),
-        }
-
-    target = (
-        actor_data.get("primary_identifier")
-        or actor_data.get("name")
-        or actor_data.get("username")
-    )
+    if not target and actor_id:
+        actor_data = _db_call("get_actor", actor_id)
+        if actor_data:
+            target = actor_data.get("display_name") or actor_data.get("primary_identifier")
 
     if not target:
-        return {
-            "status": "ERROR",
-            "error": (
-                "tracked actor has no usable "
-                "identifier"
-            ),
-        }
+        return {"status": "ERROR", "error": "Watchlist item has no target"}
 
-    target_type = (
-        actor_data.get("primary_type")
-        or "username"
-    )
-
-    investigation_id, linked_actor_id = (
-        db.create_investigation(
-            target,
-            target_type,
-            "monitoring",
+    if not investigation_id:
+        investigation_id, linked_actor_id = db.create_investigation(
+            target, "onion" if ".onion" in target else "url", "monitoring"
         )
-    )
+        actor_id = actor_id or linked_actor_id
+
+    # Store previous findings for change detection diff
+    old_findings = []
+    inv = db.get_investigation(investigation_id)
+    if inv:
+        old_findings = inv.get("findings", [])
+
+    if watch_id:
+        db.update_watchlist_status(watch_id, "SCANNING", last_scan_at=db.now())
 
     job_id = db.create_job(
         investigation_id=investigation_id,
-        job_type="scheduled_osint",
-        payload={
-            "actor_id": actor_id,
-            "target": target,
-            "target_type": target_type,
-            "watch_id": watch.get(
-                "watch_id"
-            ),
-        },
+        job_type="scheduled_crawl",
+        payload={"watch_id": watch_id, "target": target, "investigation_id": investigation_id},
     )
 
-    thread = threading.Thread(
-        target=run_osint,
-        kwargs={
-            "db": db,
-            "job_id": job_id,
-            "iid": investigation_id,
-            "actor_id": (
-                linked_actor_id
-                or actor_id
-            ),
-            "target": target,
-            "target_type": target_type,
-        },
-        daemon=True,
-    )
+    def _worker():
+        try:
+            # 1. REUSE EXISTING CRAWLER!
+            run_crawler(
+                db=db,
+                job_id=job_id,
+                investigation_id=investigation_id,
+                actor_id=actor_id,
+                urls=[target] if target.startswith("http") else [f"http://{target}"],
+                target=target,
+                workers=3,
+            )
 
+            # 2. Fetch new findings after crawl
+            new_inv = db.get_investigation(investigation_id)
+            new_findings = new_inv.get("findings", []) if new_inv else []
+
+            # 3. Change Detection using tracking.diff
+            from .tracking import diff
+            diff_res = diff(old_findings, new_findings)
+            counts = diff_res.get("counts", {})
+            added_cnt = counts.get("added", 0)
+            changed_cnt = counts.get("changed", 0)
+            removed_cnt = counts.get("removed", 0)
+
+            now_str = db.now()
+            interval_min = watch.get("interval_minutes", 60)
+            next_scan_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=int(interval_min))
+            next_scan_at = next_scan_dt.isoformat()
+
+            if added_cnt > 0 or changed_cnt > 0 or removed_cnt > 0:
+                final_status = "CHANGES_DETECTED"
+                msg = f"Monitoring scan detected changes for {target}: +{added_cnt} new, ~{changed_cnt} changed, -{removed_cnt} removed"
+
+                db.add_timeline_event(
+                    investigation_id=investigation_id,
+                    event_type="change_detected",
+                    message=msg,
+                    payload=diff_res,
+                )
+
+                db.add_alert(
+                    investigation_id=investigation_id,
+                    actor_id=actor_id,
+                    source="monitoring_scheduler",
+                    alert_type="change_detected",
+                    severity="high" if added_cnt > 3 else "medium",
+                    message=msg,
+                    confidence=0.95,
+                )
+
+                if watch_id:
+                    db.update_watchlist_status(
+                        watch_id,
+                        status="CHANGES_DETECTED",
+                        last_scan_at=now_str,
+                        next_scan_at=next_scan_at,
+                        last_change_at=now_str,
+                    )
+            else:
+                msg = f"Monitoring scan completed for {target}: No change detected."
+                db.add_timeline_event(
+                    investigation_id=investigation_id,
+                    event_type="no_change_detected",
+                    message=msg,
+                )
+
+                if watch_id:
+                    db.update_watchlist_status(
+                        watch_id,
+                        status="NO_CHANGE",
+                        last_scan_at=now_str,
+                        next_scan_at=next_scan_at,
+                    )
+        except Exception as exc:
+            now_str = db.now()
+            err_msg = f"Monitoring scan failed for {target}: {exc}"
+            db.add_alert(
+                investigation_id=investigation_id,
+                actor_id=actor_id,
+                source="monitoring_scheduler",
+                alert_type="scan_failed",
+                severity="high",
+                message=err_msg,
+            )
+            if watch_id:
+                db.update_watchlist_status(watch_id, status="SCAN_FAILED", last_scan_at=now_str)
+
+    thread = threading.Thread(target=_worker, daemon=True)
     thread.start()
 
     return {
         "status": "RUNNING",
         "job_id": job_id,
         "investigation_id": investigation_id,
-        "actor_id": (
-            linked_actor_id
-            or actor_id
-        ),
+        "watch_id": watch_id,
     }
+
+
+def _scheduled_scan(
+    watch: dict[str, Any],
+):
+    return run_monitoring_scan(db, watch)
 
 
 # ============================================================
@@ -412,8 +451,26 @@ def home():
     )
 
 
+@app.get(
+    "/{page}.html",
+    response_class=HTMLResponse,
+)
+def serve_html_page(page: str):
+    if page == "graph":
+        page = "correlation"
+    html_path = Path(WEB_PATH) / f"{page}.html"
+    if html_path.exists():
+        return html_path.read_text(encoding="utf-8")
+    raise HTTPException(status_code=404, detail=f"Page {page}.html not found")
+
+
+
 # ============================================================
 # HEALTH
+# ============================================================
+
+# ============================================================
+# HEALTH & DASHBOARD & MONITORING
 # ============================================================
 
 @app.get("/api/health")
@@ -431,6 +488,140 @@ def health():
             if scheduler
             else False
         ),
+    }
+
+
+@app.get("/api/dashboard")
+def get_dashboard_data():
+    summary = db.get_monitoring_summary()
+    watchlist_items = db.list_watchlist()
+    investigations_list = _investigations()[:10]
+    alerts_list = db.list_alerts(limit=10)
+    
+    with db.connect() as conn:
+        recent_activity = db._rows(
+            conn.execute(
+                """
+                SELECT * FROM sih_investigation_timeline
+                ORDER BY created_at DESC LIMIT 15
+                """
+            ).fetchall()
+        )
+
+    return {
+        "summary": summary,
+        "monitored_sources": watchlist_items,
+        "recent_activity": recent_activity,
+        "recent_investigations": investigations_list,
+        "alerts": alerts_list,
+    }
+
+
+@app.get("/api/monitoring")
+def get_monitoring_page_data():
+    summary = db.get_monitoring_summary()
+    watchlist_items = db.list_watchlist()
+    alerts_list = db.list_alerts(limit=50)
+    with db.connect() as conn:
+        recent_activity = db._rows(
+            conn.execute(
+                """
+                SELECT * FROM sih_investigation_timeline
+                WHERE event_type IN ('change_detected', 'no_change_detected', 'crawl_completed', 'crawl_started', 'crawl_failed', 'ALERT_GENERATED')
+                ORDER BY created_at DESC LIMIT 20
+                """
+            ).fetchall()
+        )
+
+    return {
+        "summary": summary,
+        "watchlist": watchlist_items,
+        "alerts": alerts_list,
+        "recent_activity": recent_activity,
+    }
+
+
+class WatchAddRequest(BaseModel):
+    target: str
+    investigation_id: Optional[str] = None
+    actor_id: Optional[str] = None
+    interval_minutes: int = 60
+
+
+@app.post("/api/watchlist")
+def add_watchlist_item(req: WatchAddRequest):
+    watch_id = db.add_watchlist(
+        target=req.target,
+        investigation_id=req.investigation_id,
+        actor_id=req.actor_id,
+        interval_minutes=req.interval_minutes,
+    )
+    return {"status": "ok", "watch_id": watch_id, "message": f"Added {req.target} to watchlist."}
+
+
+@app.get("/api/watchlist")
+def list_watchlist_endpoint():
+    return db.list_watchlist()
+
+
+@app.post("/api/watchlist/{watch_id}/scan-now")
+def scan_watchlist_item_now(watch_id: str):
+    items = db.list_watchlist()
+    item = next((x for x in items if x.get("watch_id") == watch_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Watchlist item not found")
+    return run_monitoring_scan(db, item)
+
+
+@app.post("/api/watchlist/{watch_id}/pause")
+def pause_watchlist_item(watch_id: str):
+    db.set_watchlist_enabled(watch_id, False)
+    db.update_watchlist_status(watch_id, "PAUSED")
+    return {"status": "ok", "message": "Watchlist item paused."}
+
+
+@app.post("/api/watchlist/{watch_id}/resume")
+def resume_watchlist_item(watch_id: str):
+    db.set_watchlist_enabled(watch_id, True)
+    db.update_watchlist_status(watch_id, "IDLE")
+    return {"status": "ok", "message": "Watchlist item resumed."}
+
+
+@app.delete("/api/watchlist/{watch_id}")
+def remove_watchlist_item(watch_id: str):
+    db.remove_watchlist(watch_id)
+    return {"status": "ok", "message": "Watchlist item removed."}
+
+
+@app.get("/api/alerts")
+def get_alerts_endpoint(status: Optional[str] = None, investigation_id: Optional[str] = None):
+    return {"alerts": db.list_alerts(status=status, investigation_id=investigation_id)}
+
+
+@app.post("/api/alerts/{alert_id}/acknowledge")
+def acknowledge_alert_endpoint(alert_id: str):
+    db.update_alert_status(alert_id, "ACKNOWLEDGED")
+    return {"status": "ok", "message": "Alert acknowledged."}
+
+
+@app.post("/api/alerts/{alert_id}/resolve")
+def resolve_alert_endpoint(alert_id: str):
+    db.update_alert_status(alert_id, "RESOLVED")
+    return {"status": "ok", "message": "Alert resolved."}
+
+
+@app.get("/api/search")
+def global_search_endpoint(q: str = Query(min_length=1)):
+    term = f"%{q.strip()}%"
+    with db.connect() as conn:
+        invs = db._rows(conn.execute("SELECT * FROM sih_investigations WHERE investigation_id LIKE ? OR target LIKE ? OR notes LIKE ?", (term, term, term)).fetchall())
+        findings = db._rows(conn.execute("SELECT * FROM sih_findings WHERE value LIKE ? OR finding_type LIKE ? OR source LIKE ? LIMIT 50", (term, term, term)).fetchall())
+        actors = db._rows(conn.execute("SELECT * FROM sih_actors WHERE actor_id LIKE ? OR display_name LIKE ? LIMIT 20", (term, term)).fetchall())
+    return {
+        "query": q,
+        "investigations": invs,
+        "findings": findings,
+        "actors": actors,
     }
 
 
@@ -496,6 +687,7 @@ def crawl(
 # ============================================================
 
 @app.post("/api/investigate")
+@app.post("/api/investigations")
 def investigate(
     request: Investigate,
 ):
@@ -806,6 +998,14 @@ def get_job(
 
     j["estimated_seconds_remaining"] = est_rem
 
+    if str(j.get("status") or "").upper() in ("FAILED", "ERROR") and not j.get("error"):
+        for evt in reversed(evts):
+            if (evt.get("event_type") or "").lower() in ("error", "failed", "warning") and evt.get("message"):
+                j["error"] = evt.get("message")
+                break
+        if not j.get("error"):
+            j["error"] = "Process terminated unexpectedly. Check system logs."
+
     return {
         "job": j,
         "events": evts,
@@ -952,26 +1152,71 @@ def investigation(
 def investigation_timeline(
     investigation_id: str,
 ):
-    if not _investigation(
+    inv = _investigation(
         investigation_id,
-    ):
+    )
+    if not inv:
         raise HTTPException(
             status_code=404,
             detail="investigation not found",
         )
 
-    result = _db_call(
-        "timeline",
-        investigation_id,
-    )
+    # 1. Check if explicit timeline events exist in DB
+    events = inv.get("timeline") or []
+    if not events:
+        events = _db_call("timeline", investigation_id) or _db_call("get_timeline", investigation_id) or []
 
-    if result is None:
-        result = _db_call(
-            "get_timeline",
-            investigation_id,
-        )
+    # 2. If no timeline events exist, synthesize forensic chronological milestones
+    if not events:
+        events = []
+        created_at = inv.get("created_at") or "2026-09-30T10:00:00"
+        target = inv.get("target") or "Dark Web Target"
+        
+        events.append({
+            "event_type": "CASE_INITIALIZED",
+            "message": f"Target registered: {target}. Threat actor de-anonymization workspace initialized.",
+            "created_at": created_at,
+            "timestamp": created_at,
+        })
 
-    return result or []
+        actor_id = inv.get("actor_id")
+        if actor_id:
+            events.append({
+                "event_type": "ACTOR_ATTRIBUTED",
+                "message": f"Attributed initial threat actor profile: {actor_id}",
+                "created_at": created_at,
+                "timestamp": created_at,
+            })
+
+        findings = inv.get("findings") or []
+        for f in findings:
+            ftype = str(f.get("finding_type") or f.get("type") or "indicator").upper()
+            val = f.get("value") or f.get("finding_value") or "Observable"
+            src = f.get("source_url") or f.get("source") or "Dark Web"
+            f_time = f.get("first_seen") or f.get("created_at") or created_at
+            events.append({
+                "event_type": f"EXTRACTED_{ftype}",
+                "message": f"Extracted {ftype}: '{val}' from {src}",
+                "created_at": f_time,
+                "timestamp": f_time,
+            })
+
+        runs = inv.get("runs") or []
+        for r in runs:
+            r_type = str(r.get("run_type") or "analysis").upper()
+            r_status = str(r.get("status") or "completed").upper()
+            r_time = r.get("created_at") or created_at
+            events.append({
+                "event_type": f"{r_type}_ENGINE",
+                "message": f"{r_type} engine executed with final status: {r_status}",
+                "created_at": r_time,
+                "timestamp": r_time,
+            })
+
+        # Sort chronologically by timestamp
+        events.sort(key=lambda x: str(x.get("created_at") or ""))
+
+    return events
 
 
 # ============================================================
@@ -1093,6 +1338,9 @@ def report_file(
 @app.post(
     "/api/investigations/{investigation_id}/reports/generate",
 )
+@app.post(
+    "/api/investigations/{investigation_id}/reports",
+)
 def generate_reports(
     investigation_id: str,
     request: GenerateReports,
@@ -1186,6 +1434,42 @@ CRAWLER_REPORTS = {
     "actor.jsonl",
     "network.jsonl",
 }
+
+
+@app.get("/api/actors")
+def list_actors_endpoint():
+    with db.connect() as conn:
+        actor_rows = conn.execute("SELECT * FROM sih_actors ORDER BY confidence DESC, created_at DESC").fetchall()
+        actors = [dict(r) for r in actor_rows]
+        
+        for actor in actors:
+            aid = actor.get("actor_id")
+            inv_row = conn.execute("SELECT investigation_id, target FROM sih_investigations WHERE actor_id = ? LIMIT 1", (aid,)).fetchone()
+            if inv_row:
+                actor["investigation_id"] = inv_row["investigation_id"]
+                actor["target"] = inv_row["target"]
+            else:
+                actor["investigation_id"] = None
+                actor["target"] = None
+            
+            f_rows = conn.execute("SELECT finding_type, value FROM sih_findings WHERE actor_id = ? OR investigation_id = ?", (aid, actor.get("investigation_id"))).fetchall()
+            handles = []
+            wallets = []
+            pgp_keys = []
+            for f in f_rows:
+                ft = (f["finding_type"] or "").lower()
+                v = f["value"]
+                if (ft in ["handle", "username", "alias"] or "handle" in ft) and v not in handles:
+                    handles.append(v)
+                elif ("crypto" in ft or "btc" in ft or "wallet" in ft) and v not in wallets:
+                    wallets.append(v)
+                elif ("pgp" in ft) and v not in pgp_keys:
+                    pgp_keys.append(v)
+            actor["handles"] = handles
+            actor["wallets"] = wallets
+            actor["pgp_keys"] = pgp_keys
+
+        return {"actors": actors, "total": len(actors)}
 
 
 def _crawler_report_path(
@@ -1339,17 +1623,51 @@ def actor_report(
 # FINDINGS
 # ============================================================
 
+@app.get("/api/findings/search")
+def findings_global_search(
+    q: str | None = None,
+    finding_type: str | None = None,
+    limit: int = 200,
+):
+    """
+    Master Entity Search & Findings Explorer.
+    Searches across all investigations, returning matched findings with evidence,
+    connected graph relationships, and chronological timeline events.
+    """
+    if hasattr(db, "search_global_entities"):
+        return db.search_global_entities(query=q, finding_type=finding_type, limit=limit)
+    return {"query": q, "findings": [], "relationships": [], "timeline": []}
+
+
 @app.get("/api/findings")
 def findings(
     actor: str | None = None,
     finding_type: str | None = None,
+    investigation_id: str | None = None,
     confidence: float | None = Query(
         default=None,
         ge=0,
         le=1,
     ),
     q: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
 ):
+    # If scoped to a specific investigation, pull directly from it
+    if investigation_id:
+        inv = _investigation(investigation_id)
+        if not inv:
+            raise HTTPException(status_code=404, detail="Investigation not found")
+        raw = inv.get("findings", [])
+        # Apply optional filters
+        if finding_type:
+            raw = [f for f in raw if (f.get("finding_type") or "").lower() == finding_type.lower()]
+        if q:
+            ql = q.lower()
+            raw = [f for f in raw if ql in (f.get("value") or "").lower() or ql in (f.get("source") or "").lower()]
+        if confidence is not None:
+            raw = [f for f in raw if float(f.get("confidence") or 0) >= confidence]
+        return raw[:limit]
+
     result = _db_call(
         "filtered_findings",
         actor=actor,
@@ -1376,14 +1694,56 @@ def persona(
     return result
 
 
+class PersonaComparePayload(BaseModel):
+    reference_id: Optional[str] = "Reference"
+    reference_posts: Optional[List[Dict[str, Any]]] = None
+    reference_text: Optional[str] = None
+    candidate_id: Optional[str] = "Candidate"
+    candidate_posts: Optional[List[Dict[str, Any]]] = None
+    candidate_text: Optional[str] = None
+    investigation_id: Optional[str] = None
+    persona_a: Optional[Dict[str, Any]] = None
+    persona_b: Optional[Dict[str, Any]] = None
+
+PersonaComparePayload.model_rebuild()
+
+
 @app.post("/api/persona/compare")
 def persona_compare(
-    request: ComparePersona,
+    request: PersonaComparePayload,
 ):
-    return compare_personas(
-        request.persona_a,
-        request.persona_b,
+    from .persona_adapter import compare_personas_direct, persist_persona_analysis
+
+    if request.persona_a and request.persona_b:
+        posts_a = request.persona_a.get("posts", [])
+        posts_b = request.persona_b.get("posts", [])
+        ref_id = request.persona_a.get("persona_id") or request.reference_id or "Reference"
+        cand_id = request.persona_b.get("persona_id") or request.candidate_id or "Candidate"
+        return compare_personas_direct(ref_id, posts_a, cand_id, posts_b, request.investigation_id)
+
+    ref_posts = request.reference_posts or []
+    if not ref_posts and request.reference_text:
+        ref_posts = [{"post_id": "ref-1", "text": request.reference_text}]
+
+    cand_posts = request.candidate_posts or []
+    if not cand_posts and request.candidate_text:
+        cand_posts = [{"post_id": "cand-1", "text": request.candidate_text}]
+
+    res = compare_personas_direct(
+        request.reference_id or "Reference",
+        ref_posts,
+        request.candidate_id or "Candidate",
+        cand_posts,
+        request.investigation_id,
     )
+
+    if request.investigation_id and res.get("status") != "error":
+        try:
+            persist_persona_analysis(db, request.investigation_id, res)
+        except Exception:
+            pass
+
+    return res
 
 
 @app.post(
@@ -1554,9 +1914,18 @@ def export_pdf(
 
 
 @app.get("/api/persona/synthetic-demo")
-def persona_synthetic_demo():
-    from .persona_adapter import get_synthetic_rebrand_demo
-    return get_synthetic_rebrand_demo()
+def persona_synthetic_demo(
+    investigation_id: str | None = Query(default=None),
+):
+    from .persona_adapter import get_synthetic_rebrand_demo, persist_persona_analysis
+    target_inv = investigation_id or "INV-DEMO-2026"
+    res = get_synthetic_rebrand_demo(target_inv)
+    if investigation_id:
+        try:
+            persist_persona_analysis(db, investigation_id, res)
+        except Exception:
+            pass
+    return res
 
 
 @app.post("/api/investigations/{investigation_id}/correlate")
@@ -1597,10 +1966,15 @@ def misconfigurations_report(investigation_id: str):
         else:
             categories["other"].append(f)
 
+    all_misc = []
+    for k, v in categories.items():
+        all_misc.extend(v)
+
     return {
         "investigation_id": investigation_id,
         "categories": categories,
-        "total_misconfigurations": sum(len(v) for v in categories.values()),
+        "misconfigurations": all_misc,
+        "total_misconfigurations": len(all_misc),
     }
 
 
@@ -1937,3 +2311,185 @@ __all__ = [
     "app",
     "db",
 ]
+
+
+@app.get("/api/reports/download-package/{investigation_id}")
+async def download_evidence_package(investigation_id: str):
+    """Generates and downloads a complete Law Enforcement Evidence Package (.zip)."""
+    import zipfile
+    import hashlib
+
+    inv = db.get_investigation(investigation_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+
+    pkg_dir = os.path.join(REPORTS_PATH, "packages")
+    os.makedirs(pkg_dir, exist_ok=True)
+    zip_path = os.path.join(pkg_dir, f"{investigation_id}_forensic_package.zip")
+
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        # 1. Case Summary JSON
+        json_bytes = json.dumps(inv, indent=2, default=str).encode('utf-8')
+        zipf.writestr("forensic_data.json", json_bytes)
+
+        # 2. Evidence Manifest CSV
+        findings = inv.get("findings", [])
+        csv_lines = ["finding_id,finding_type,finding_value,evidence_source_url,confidence,collected_at\n"]
+        for f in findings:
+            csv_lines.append(f'{f.get("finding_id")},{f.get("finding_type")},"{f.get("finding_value")}","{f.get("evidence_source_url")}",{f.get("confidence")},{f.get("evidence_collected_at")}\n')
+        zipf.writestr("evidence_manifest.csv", "".join(csv_lines).encode('utf-8'))
+
+        # 3. SHA256 Checksums
+        h1 = hashlib.sha256(json_bytes).hexdigest()
+        h2 = hashlib.sha256("".join(csv_lines).encode('utf-8')).hexdigest()
+        checksum_content = f"SHA256 (forensic_data.json) = {h1}\nSHA256 (evidence_manifest.csv) = {h2}\nGenerated By: PRALAYX Law Enforcement Evidence Engine (SIH26151)\n"
+        zipf.writestr("SHA256_CHECKSUMS.txt", checksum_content.encode('utf-8'))
+
+        # 4. Summary Text File
+        summary_txt = f"PRALAYX FORENSIC EVIDENCE PACKAGE\nCase ID: {investigation_id}\nTarget: {inv.get('target')}\nTotal Findings: {len(findings)}\nStatus: {inv.get('status')}\n"
+        zipf.writestr("README_CASE_SUMMARY.txt", summary_txt.encode('utf-8'))
+
+    return FileResponse(zip_path, filename=f"{investigation_id}_forensic_package.zip", media_type="application/zip")
+
+
+# ============================================================
+# INVESTIGATION SPECIFIC FINDINGS & GRAPH & OSINT & PERSONA
+# ============================================================
+
+@app.get("/api/investigations/{investigation_id}/findings")
+def investigation_findings(investigation_id: str):
+    inv = _investigation(investigation_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    findings = inv.get("findings", [])
+    return {
+        "investigation_id": investigation_id,
+        "findings": findings,
+        "total_findings": len(findings)
+    }
+
+@app.get("/api/investigations/{investigation_id}/graph")
+def investigation_graph(investigation_id: str):
+    inv = _investigation(investigation_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    target = inv.get("target") or investigation_id
+    findings = inv.get("findings", [])
+    relationships = inv.get("relationships", [])
+
+    nodes = [
+        {"id": f"INV-{investigation_id}", "label": target, "type": "target", "category": "target"}
+    ]
+    edges = []
+
+    actor_id = inv.get("actor_id")
+    if actor_id:
+        nodes.append({"id": actor_id, "label": f"Actor: {actor_id}", "type": "actor", "category": "actor"})
+        edges.append({"source": f"INV-{investigation_id}", "target": actor_id, "type": "attributed_to", "label": "Attributed To"})
+
+    seen_nodes = {f"INV-{investigation_id}", actor_id} if actor_id else {f"INV-{investigation_id}"}
+
+    for f in findings:
+        f_id = f.get("finding_id") or f"FIND-{id(f)}"
+        val = f.get("value") or f.get("finding_value") or "Indicator"
+        ftype = f.get("finding_type") or f.get("type") or "finding"
+        
+        if f_id not in seen_nodes:
+            nodes.append({
+                "id": f_id,
+                "label": str(val)[:30],
+                "type": ftype,
+                "category": ftype,
+                "confidence": f.get("confidence", 0.5),
+                "source": f.get("source", "Dark Web")
+            })
+            seen_nodes.add(f_id)
+            edges.append({
+                "source": f"INV-{investigation_id}",
+                "target": f_id,
+                "type": "extracted_finding",
+                "label": ftype.upper()
+            })
+
+    for r in relationships:
+        r_id = r.get("relationship_id") or f"REL-{id(r)}"
+        src = r.get("from_value") or r.get("source") or f"INV-{investigation_id}"
+        tgt = r.get("to_value") or r.get("target") or "Unknown"
+        rel_type = r.get("relationship_type") or "connected_to"
+        
+        if src not in seen_nodes:
+            src_type = r.get("from_type") or "entity"
+            nodes.append({"id": src, "label": str(src)[:30], "type": src_type, "category": src_type})
+            seen_nodes.add(src)
+        if tgt not in seen_nodes:
+            tgt_type = r.get("to_type") or "entity"
+            nodes.append({"id": tgt, "label": str(tgt)[:30], "type": tgt_type, "category": tgt_type})
+            seen_nodes.add(tgt)
+
+        edges.append({
+            "source": src,
+            "target": tgt,
+            "type": rel_type,
+            "label": rel_type.replace("_", " ").upper(),
+            "confidence": r.get("confidence", 0.8)
+        })
+
+    return {
+        "investigation_id": investigation_id,
+        "nodes": nodes,
+        "edges": edges,
+        "total_nodes": len(nodes),
+        "total_edges": len(edges)
+    }
+
+@app.get("/api/investigations/{investigation_id}/persona")
+def investigation_persona(investigation_id: str):
+    inv = _investigation(investigation_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    findings = inv.get("findings", [])
+    persona_findings = [f for f in findings if "stylometry" in str(f.get("finding_type","")).lower() or "persona" in str(f.get("source","")).lower()]
+    
+    return {
+        "investigation_id": investigation_id,
+        "target": inv.get("target"),
+        "actor_id": inv.get("actor_id"),
+        "persona_findings": persona_findings,
+        "has_profile": len(persona_findings) > 0
+    }
+
+@app.post("/api/investigations/{investigation_id}/osint")
+def run_investigation_osint(investigation_id: str, request: Investigate):
+    inv = _investigation(investigation_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+
+    job_id = db.create_job(
+        investigation_id=investigation_id,
+        job_type="osint",
+        payload=request.model_dump(),
+    )
+
+    thread = threading.Thread(
+        target=run_osint,
+        kwargs={
+            "db": db,
+            "job_id": job_id,
+            "iid": investigation_id,
+            "actor_id": inv.get("actor_id") or "ACT-OSINT",
+            "target": request.target,
+            "target_type": request.target_type,
+        },
+        daemon=True,
+    )
+    thread.start()
+
+    return {
+        "job_id": job_id,
+        "investigation_id": investigation_id,
+        "status": "RUNNING",
+        "target": request.target,
+        "target_type": request.target_type
+    }

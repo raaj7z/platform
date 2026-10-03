@@ -3,99 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>PRALAYX -- Timeline Query & Terminal Log</title>
+  <title>PRALAYX — Live Terminal Stream</title>
   <link rel="stylesheet" href="/web/app.css">
 </head>
 <body>
   <div class="app">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="logo-mark">◒</div>
-        <div>
-          <div class="logo-name">PRALAY<em>X</em></div>
-          <span class="logo-sub">Dark Web Threat De-anonymization</span>
-        </div>
-      </div>
-      <nav class="nav">
-        <div class="nav-title">OPERATIONS</div>
-        <a data-page="dashboard" href="/web/index.html"><span class="nav-ico">⌂</span>Dashboard Overview</a>
-        <a data-page="crawl" href="/web/crawl.html"><span class="nav-ico">＋</span>New Crawl</a>
-        <a data-page="investigations" href="/web/investigations.html"><span class="nav-ico">⌕</span>Investigations Workspace</a>
-        <div class="nav-title">INTELLIGENCE</div>
-        <a data-page="correlation" href="/web/correlation.html"><span class="nav-ico">⌘</span>Relationship Graph</a>
-        <a data-page="osint" href="/web/osint.html"><span class="nav-ico">◎</span>OSINT & Misconfigurations</a>
-        <a data-page="analysis" href="/web/analysis.html"><span class="nav-ico">⌁</span>AI Stylometry / Persona</a>
-        <a data-page="reports" href="/web/reports.html"><span class="nav-ico">▤</span>Final Reports & Export</a>
-        <div class="nav-title">MONITORING</div>
-        <a data-page="monitoring" href="/web/monitoring.html"><span class="nav-ico">◉</span>Watchlist & Alerts</a>
-        <div class="nav-title">SYSTEM</div>
-        <a data-page="terminal" href="/web/terminal.html"><span class="nav-ico">›_</span>Terminal Log</a>
-        <a data-page="settings" href="/web/settings.html"><span class="nav-ico">⚙</span>Settings</a>
-      </nav>
-      <div class="sidebar-foot">
-        <button id="btn-toggle-theme" type="button" class="btn ghost" style="width:100%;margin-bottom:10px;font-size:11px;height:32px;display:flex;align-items:center;justify-content:center;gap:6px">☀️ Day Mode</button>
-        <div>PRALAYX v2.0 (SIH26151)<br>EVIDENCE · ENTITY · ATTRIBUTION</div>
-      </div>
-    </aside>
+    <aside class="sidebar"><!-- Nav rendered by app.js --></aside>
     <main class="main">
-      <header class="top">
+      <div id="investigation-context-root"></div>
+
+      <div class="header-title" style="display:flex;justify-content:space-between;align-items:flex-end">
         <div>
-          <span class="kicker">SYSTEM LOGS & ANALYTICAL TIMELINE</span>
-          <h1>Timeline Query & Live Terminal</h1>
+          <span class="kicker">SYSTEM LOG STREAM</span>
+          <h1>Live Investigation Terminal</h1>
+          <p>Real-time crawler execution events, proxy connection handshakes, and OSINT task output.</p>
         </div>
-        <span class="case-chip">AUDIT TRAIL</span>
-      </header>
+        <span class="badge green">SOCKET ONLINE</span>
+      </div>
 
-      <!-- Analytical Timeline Filter Controls -->
-      <section class="panel panel-pad section" style="background:#0f172a;margin-bottom:16px">
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <span style="font-size:11px;font-weight:bold;color:#94a3b8">Date Range:</span>
-          <input class="input" type="date" value="2026-09-01" style="width:140px;font-size:10px">
-          <span style="color:#64748b">to</span>
-          <input class="input" type="date" value="2026-09-27" style="width:140px;font-size:10px">
-
-          <span style="font-size:11px;font-weight:bold;color:#94a3b8;margin-left:12px">Event Type:</span>
-          <select class="select" style="width:140px;font-size:10px">
-            <option value="all">All Events</option>
-            <option value="crawl">Crawl Events</option>
-            <option value="osint">OSINT Events</option>
-            <option value="persona">Persona Events</option>
-            <option value="alert">Alert Events</option>
-          </select>
-
-          <button class="btn" style="height:34px;font-size:10px;padding:0 14px">Apply Filter</button>
+      <section class="panel">
+        <div class="terminal" id="terminal-stream" style="min-height:500px">
+          <span class="terminal-line info">[PRALAYX SYSTEM] Terminal initialized. Awaiting engine events...</span>
         </div>
       </section>
-
-      <!-- Timeline & Terminal Split Grid -->
-      <div class="grid g2 section">
-        <!-- Chronological Timeline Events -->
-        <section class="panel">
-          <div class="section-title panel-pad">
-            <h2>8. Timeline Query (Analytical Event History)</h2>
-            <span class="kicker">PERSISTED EVENTS</span>
-          </div>
-          <div id="case-timeline" class="panel-pad"></div>
-        </section>
-
-        <!-- Live Terminal Output Stream -->
-        <section class="panel">
-          <div class="section-title panel-pad">
-            <h2>Live Execution Stream</h2>
-            <span class="status RUNNING">STREAM ACTIVE</span>
-          </div>
-          <div id="live-session" class="panel-pad">
-            <div class="terminal-body" style="min-height:260px">
-              <div class="terminal-line info">[16:14:47] [INFO] Platform schema initialized (v2)</div>
-              <div class="terminal-line success">[16:14:48] [SUCCESS] Database pralayx.db migration verified</div>
-              <div class="terminal-line info">[16:36:02] [INFO] DarkWeb-Deanonymization: Tier-1, Tier-2, Tier-3 reports written</div>
-              <div class="terminal-line success">[16:37:27] [SUCCESS] OSINT Engine: All 8 scanners verified</div>
-              <div class="terminal-line success">[16:35:50] [SUCCESS] Persona Engine: 30/30 pytest tests passed</div>
-              <div class="terminal-line info">[16:47:35] [INFO] Consolidated PDF/HTML/JSON/CSV report generators online</div>
-            </div>
-          </div>
-        </section>
-      </div>
     </main>
   </div>
   <script src="/web/app.js"></script>

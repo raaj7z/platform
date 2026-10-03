@@ -60,6 +60,30 @@ class DB:
 
         return conn
 
+    @property
+    def conn(self) -> sqlite3.Connection:
+        """
+        Shared connection property for third-party modules or engines
+        expecting a .conn attribute on the database instance.
+        """
+        if getattr(self, "_shared_conn", None) is None:
+            self._shared_conn = self.connect()
+        return self._shared_conn
+
+    def execute(self, *args, **kwargs):
+        return self.conn.execute(*args, **kwargs)
+
+    def commit(self):
+        return self.conn.commit()
+
+    def rollback(self):
+        return self.conn.rollback()
+
+    def save_investigation(self, *args, **kwargs):
+        """Safe compatibility handler for external engine calls."""
+        pass
+
+
     def _initialize(self) -> None:
         """
         The actual schema is supplied by shared/schema_sqlite.sql.
@@ -83,6 +107,26 @@ class DB:
         )
 
         with self.connect() as conn:
+            # Safe column migrations for existing databases before executing script/indices
+            for table, col, col_type in [
+                ("sih_watchlist", "target", "TEXT"),
+                ("sih_watchlist", "investigation_id", "TEXT"),
+                ("sih_watchlist", "status", "TEXT DEFAULT 'IDLE'"),
+                ("sih_watchlist", "next_scan_at", "TEXT"),
+                ("sih_watchlist", "last_change_at", "TEXT"),
+                ("sih_alerts", "investigation_id", "TEXT"),
+                ("sih_alerts", "source", "TEXT"),
+                ("sih_alerts", "severity", "TEXT DEFAULT 'medium'"),
+                ("sih_alerts", "status", "TEXT DEFAULT 'NEW'"),
+                ("sih_observations", "source", "TEXT"),
+                ("sih_observations", "value", "TEXT"),
+                ("sih_observations", "entity_type", "TEXT"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
+                except Exception:
+                    pass
+
             conn.executescript(schema)
             conn.commit()
 
@@ -282,60 +326,60 @@ class DB:
             investigation["findings"] = self._rows(
                 conn.execute(
                     """
-                    SELECT *
-                    FROM sih_findings
-                    WHERE investigation_id = ?
-                    ORDER BY first_seen DESC
+                    SELECT f.*, e.evidence_id, e.excerpt as evidence_excerpt, 
+                           COALESCE(e.source_url, f.source_url) as evidence_source_url,
+                           e.collected_at as evidence_collected_at, e.evidence_type
+                    FROM sih_findings f
+                    LEFT JOIN sih_evidence e ON f.finding_id = e.finding_id
+                    WHERE f.investigation_id = ?
+                    ORDER BY f.first_seen DESC
                     """,
                     (investigation_id,),
                 ).fetchall()
             )
 
-            investigation["observations"] = self._rows(
+            investigation["evidence"] = self._rows(
                 conn.execute(
                     """
-                    SELECT *
-                    FROM sih_observations
-                    WHERE investigation_id = ?
-                    ORDER BY observed_at DESC
+                    SELECT e.*, f.finding_type, f.value as finding_value, f.source as finding_source
+                    FROM sih_evidence e
+                    INNER JOIN sih_findings f ON e.finding_id = f.finding_id
+                    WHERE f.investigation_id = ?
+                    ORDER BY e.collected_at DESC
                     """,
                     (investigation_id,),
                 ).fetchall()
             )
+
+            try:
+                investigation["observations"] = self._rows(
+                    conn.execute(
+                        """
+                        SELECT *
+                        FROM sih_observations
+                        WHERE investigation_id = ?
+                        ORDER BY observed_at DESC
+                        """,
+                        (investigation_id,),
+                    ).fetchall()
+                )
+            except Exception:
+                investigation["observations"] = []
 
             investigation["relationships"] = self._rows(
                 conn.execute(
                     """
-                    SELECT *
-                    FROM sih_relationships
-                    WHERE investigation_id = ?
-                    ORDER BY observed_at DESC
+                    SELECT r.*, e.source_url as evidence_source_url, e.excerpt as evidence_excerpt,
+                           e.metadata as evidence_metadata, e.collected_at as evidence_collected_at,
+                           e.evidence_type
+                    FROM sih_relationships r
+                    LEFT JOIN sih_evidence e ON r.evidence_id = e.evidence_id
+                    WHERE r.investigation_id = ?
+                    ORDER BY r.observed_at DESC
                     """,
                     (investigation_id,),
                 ).fetchall()
             )
-
-            if not investigation["relationships"] and investigation.get("findings"):
-                synth = []
-                target_val = investigation.get("target") or investigation_id
-                actor_val = investigation.get("actor_id") or target_val
-                for idx, f in enumerate(investigation["findings"]):
-                    f_type = f.get("finding_type", "finding")
-                    f_val = f.get("value")
-                    if f_val:
-                        synth.append({
-                            "relationship_id": f"SYNTH-{idx}-{f.get('finding_id', 'REL')}",
-                            "investigation_id": investigation_id,
-                            "from_type": "actor",
-                            "from_value": actor_val,
-                            "relationship_type": f"has_{f_type}",
-                            "to_type": f_type,
-                            "to_value": f_val,
-                            "confidence": f.get("confidence", 0.8),
-                            "source": f.get("source", "crawler"),
-                            "source_url": f.get("source_url")
-                        })
-                investigation["relationships"] = synth
 
             investigation["reports"] = self._rows(
                 conn.execute(
@@ -344,6 +388,18 @@ class DB:
                     FROM sih_reports
                     WHERE investigation_id = ?
                     ORDER BY created_at DESC
+                    """,
+                    (investigation_id,),
+                ).fetchall()
+            )
+
+            investigation["timeline"] = self._rows(
+                conn.execute(
+                    """
+                    SELECT *
+                    FROM sih_investigation_timeline
+                    WHERE investigation_id = ?
+                    ORDER BY created_at ASC
                     """,
                     (investigation_id,),
                 ).fetchall()
@@ -1426,16 +1482,22 @@ class DB:
             return self._rows(rows)
 
     # ------------------------------------------------------------------
-    # Watchlist
+    # Watchlist & Monitoring
     # ------------------------------------------------------------------
 
     def add_watchlist(
         self,
-        actor_id: str,
+        target: str,
+        investigation_id: Optional[str] = None,
+        actor_id: Optional[str] = None,
         interval_minutes: int = 60,
     ) -> str:
         watch_id = self._id("WATCH")
         now = self.now()
+        clean_target = str(target or "").strip()
+        
+        next_scan_dt = datetime.now(timezone.utc) + timedelta(minutes=int(interval_minutes))
+        next_scan_at = next_scan_dt.isoformat()
 
         with self.connect() as conn:
             conn.execute(
@@ -1443,17 +1505,24 @@ class DB:
                 INSERT INTO sih_watchlist (
                     watch_id,
                     actor_id,
+                    target,
+                    investigation_id,
                     interval_minutes,
                     enabled,
+                    status,
+                    next_scan_at,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, 1, ?, ?)
+                VALUES (?, ?, ?, ?, ?, 1, 'IDLE', ?, ?, ?)
                 """,
                 (
                     watch_id,
                     actor_id,
+                    clean_target,
+                    investigation_id,
                     int(interval_minutes),
+                    next_scan_at,
                     now,
                     now,
                 ),
@@ -1483,16 +1552,53 @@ class DB:
                     """
                     SELECT
                         w.*,
-                        a.display_name,
-                        a.category,
-                        a.confidence
+                        COALESCE(i.target, w.target) as target_display,
+                        i.target_type,
+                        a.display_name as actor_name
                     FROM sih_watchlist w
-                    LEFT JOIN sih_actors a
-                        ON a.actor_id = w.actor_id
+                    LEFT JOIN sih_investigations i ON i.investigation_id = w.investigation_id
+                    LEFT JOIN sih_actors a ON a.actor_id = w.actor_id
                     ORDER BY w.created_at DESC
                     """
                 ).fetchall()
             )
+
+    def update_watchlist_status(
+        self,
+        watch_id: str,
+        status: str,
+        last_scan_at: Optional[str] = None,
+        next_scan_at: Optional[str] = None,
+        last_change_at: Optional[str] = None,
+    ) -> None:
+        now = self.now()
+        updates = ["status = ?", "updated_at = ?"]
+        params = [status, now]
+
+        if last_scan_at:
+            updates.append("last_scan_at = ?")
+            params.append(last_scan_at)
+        if next_scan_at:
+            updates.append("next_scan_at = ?")
+            params.append(next_scan_at)
+        if last_change_at:
+            updates.append("last_change_at = ?")
+            params.append(last_change_at)
+
+        params.append(watch_id)
+        query = f"UPDATE sih_watchlist SET {', '.join(updates)} WHERE watch_id = ?"
+
+        with self.connect() as conn:
+            conn.execute(query, params)
+            conn.commit()
+
+    def set_watchlist_enabled(self, watch_id: str, enabled: bool) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE sih_watchlist SET enabled = ?, updated_at = ? WHERE watch_id = ?",
+                (1 if enabled else 0, self.now(), watch_id),
+            )
+            conn.commit()
 
     # ------------------------------------------------------------------
     # Alerts
@@ -1500,37 +1606,48 @@ class DB:
 
     def add_alert(
         self,
-        actor_id: Optional[str],
-        finding_id: Optional[str],
-        alert_type: str,
-        message: str,
+        investigation_id: Optional[str] = None,
+        actor_id: Optional[str] = None,
+        finding_id: Optional[str] = None,
+        source: Optional[str] = None,
+        alert_type: str = "monitoring_event",
+        severity: str = "medium",
+        message: str = "",
         confidence: Optional[float] = None,
     ) -> str:
         alert_id = self._id("ALERT")
+        now = self.now()
 
         with self.connect() as conn:
             conn.execute(
                 """
                 INSERT INTO sih_alerts (
                     alert_id,
+                    investigation_id,
                     actor_id,
                     finding_id,
+                    source,
                     alert_type,
+                    severity,
                     message,
                     confidence,
+                    status,
                     is_read,
                     created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW', 0, ?)
                 """,
                 (
                     alert_id,
+                    investigation_id,
                     actor_id,
                     finding_id,
+                    source,
                     alert_type,
+                    severity,
                     message,
                     confidence,
-                    self.now(),
+                    now,
                 ),
             )
             conn.commit()
@@ -1539,38 +1656,77 @@ class DB:
 
     def list_alerts(
         self,
+        status: Optional[str] = None,
+        investigation_id: Optional[str] = None,
         unread_only: bool = False,
         limit: int = 100,
     ) -> list[dict]:
         with self.connect() as conn:
-            if unread_only:
-                rows = conn.execute(
-                    """
-                    SELECT *
-                    FROM sih_alerts
-                    WHERE is_read = 0
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                    """,
-                    (limit,),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    """
-                    SELECT *
-                    FROM sih_alerts
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                    """,
-                    (limit,),
-                ).fetchall()
+            query = "SELECT * FROM sih_alerts"
+            params = []
+            conditions = []
 
+            if unread_only:
+                conditions.append("is_read = 0")
+            elif status:
+                conditions.append("LOWER(status) = ?")
+                params.append(status.lower())
+
+            if investigation_id:
+                conditions.append("investigation_id = ?")
+                params.append(investigation_id)
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(limit)
+
+            rows = conn.execute(query, params).fetchall()
             return self._rows(rows)
+
+    def update_alert_status(self, alert_id: str, status: str) -> None:
+        is_read = 1 if status.upper() in ("ACKNOWLEDGED", "RESOLVED") else 0
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE sih_alerts SET status = ?, is_read = ? WHERE alert_id = ?",
+                (status.upper(), is_read, alert_id),
+            )
+            conn.commit()
 
     def mark_alert_read(
         self,
         alert_id: str,
     ) -> None:
+        self.update_alert_status(alert_id, "ACKNOWLEDGED")
+
+    def get_monitoring_summary(self) -> dict:
+        with self.connect() as conn:
+            sources_monitored = conn.execute("SELECT COUNT(*) FROM sih_watchlist WHERE enabled = 1").fetchone()[0]
+            active_scans = conn.execute("SELECT COUNT(*) FROM sih_jobs WHERE LOWER(status) = 'running'").fetchone()[0]
+            
+            new_findings = conn.execute(
+                "SELECT COUNT(*) FROM sih_findings WHERE first_seen >= datetime('now', '-1 day')"
+            ).fetchone()[0]
+
+            changes_detected = conn.execute(
+                "SELECT COUNT(*) FROM sih_investigation_timeline WHERE event_type IN ('change_detected', 'PAGE_CHANGED', 'NEW_FINDING') AND created_at >= datetime('now', '-1 day')"
+            ).fetchone()[0]
+
+            active_alerts = conn.execute(
+                "SELECT COUNT(*) FROM sih_alerts WHERE UPPER(status) IN ('NEW', 'ACKNOWLEDGED')"
+            ).fetchone()[0]
+
+            last_update = conn.execute("SELECT MAX(created_at) FROM sih_investigation_timeline").fetchone()[0] or self.now()
+
+            return {
+                "sources_monitored": sources_monitored,
+                "active_scans": active_scans,
+                "new_findings": new_findings,
+                "changes_detected": changes_detected,
+                "active_alerts": active_alerts,
+                "last_update": last_update,
+            }
         with self.connect() as conn:
             conn.execute(
                 """
@@ -1597,25 +1753,34 @@ class DB:
             rows = conn.execute(
                 """
                 SELECT
-                    finding_id,
-                    investigation_id,
-                    actor_id,
-                    finding_type,
-                    value,
-                    source,
-                    source_url,
-                    confidence,
-                    first_seen,
-                    last_seen
-                FROM sih_findings
-                WHERE value LIKE ?
-                   OR finding_type LIKE ?
-                   OR source LIKE ?
-                   OR source_url LIKE ?
-                ORDER BY confidence DESC, last_seen DESC
+                    f.finding_id,
+                    f.investigation_id,
+                    f.actor_id,
+                    f.finding_type,
+                    f.value,
+                    f.source,
+                    f.source_url,
+                    f.confidence,
+                    f.metadata,
+                    f.first_seen,
+                    f.last_seen,
+                    e.evidence_id,
+                    e.excerpt as evidence_excerpt,
+                    COALESCE(e.source_url, f.source_url) as evidence_source_url,
+                    e.collected_at as evidence_collected_at,
+                    e.evidence_type
+                FROM sih_findings f
+                LEFT JOIN sih_evidence e ON f.finding_id = e.finding_id
+                WHERE f.value LIKE ?
+                   OR f.finding_type LIKE ?
+                   OR f.source LIKE ?
+                   OR f.source_url LIKE ?
+                   OR f.investigation_id LIKE ?
+                ORDER BY f.confidence DESC, f.last_seen DESC
                 LIMIT ?
                 """,
                 (
+                    pattern,
                     pattern,
                     pattern,
                     pattern,
@@ -1625,6 +1790,118 @@ class DB:
             ).fetchall()
 
             return self._rows(rows)
+
+    def search_global_entities(
+        self,
+        query: Optional[str] = None,
+        finding_type: Optional[str] = None,
+        limit: int = 200,
+    ) -> dict:
+        q = (query or "").strip()
+        pattern = f"%{q}%" if q else "%"
+
+        with self.connect() as conn:
+            # 1. Matching Findings with Evidence
+            if finding_type and finding_type != "all":
+                f_rows = conn.execute(
+                    """
+                    SELECT f.*, e.evidence_id, e.excerpt as evidence_excerpt, 
+                           COALESCE(e.source_url, f.source_url) as evidence_source_url,
+                           e.collected_at as evidence_collected_at, e.evidence_type
+                    FROM sih_findings f
+                    LEFT JOIN sih_evidence e ON f.finding_id = e.finding_id
+                    WHERE (f.value LIKE ? OR f.source LIKE ? OR f.source_url LIKE ? OR f.investigation_id LIKE ? OR f.metadata LIKE ?)
+                      AND f.finding_type = ?
+                    ORDER BY f.last_seen DESC
+                    LIMIT ?
+                    """,
+                    (pattern, pattern, pattern, pattern, pattern, finding_type, limit),
+                ).fetchall()
+            else:
+                f_rows = conn.execute(
+                    """
+                    SELECT f.*, e.evidence_id, e.excerpt as evidence_excerpt, 
+                           COALESCE(e.source_url, f.source_url) as evidence_source_url,
+                           e.collected_at as evidence_collected_at, e.evidence_type
+                    FROM sih_findings f
+                    LEFT JOIN sih_evidence e ON f.finding_id = e.finding_id
+                    WHERE f.value LIKE ? OR f.finding_type LIKE ? OR f.source LIKE ? 
+                       OR f.source_url LIKE ? OR f.investigation_id LIKE ? OR f.metadata LIKE ?
+                    ORDER BY f.last_seen DESC
+                    LIMIT ?
+                    """,
+                    (pattern, pattern, pattern, pattern, pattern, pattern, limit),
+                ).fetchall()
+
+            findings = self._rows(f_rows)
+
+            # 2. Extract matched entity values to find all graph links
+            entity_vals = {q.lower()} if q else set()
+            for f in findings:
+                if f.get("value"):
+                    entity_vals.add(str(f["value"]).lower())
+
+            # 3. Matching Relationships
+            rel_rows = []
+            if entity_vals:
+                placeholders = ",".join("?" for _ in entity_vals)
+                rel_rows = conn.execute(
+                    f"""
+                    SELECT r.*, e.source_url as evidence_source_url, e.excerpt as evidence_excerpt,
+                           e.collected_at as evidence_collected_at, e.evidence_type
+                    FROM sih_relationships r
+                    LEFT JOIN sih_evidence e ON r.evidence_id = e.evidence_id
+                    WHERE LOWER(r.from_value) IN ({placeholders})
+                       OR LOWER(r.to_value) IN ({placeholders})
+                       OR r.investigation_id LIKE ?
+                    ORDER BY r.observed_at DESC
+                    LIMIT ?
+                    """,
+                    (*entity_vals, *entity_vals, pattern, limit),
+                ).fetchall()
+            else:
+                rel_rows = conn.execute(
+                    """
+                    SELECT r.*, e.source_url as evidence_source_url, e.excerpt as evidence_excerpt,
+                           e.collected_at as evidence_collected_at, e.evidence_type
+                    FROM sih_relationships r
+                    LEFT JOIN sih_evidence e ON r.evidence_id = e.evidence_id
+                    ORDER BY r.observed_at DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+
+            relationships = self._rows(rel_rows)
+
+            # 4. Timeline Events
+            timeline_rows = conn.execute(
+                """
+                SELECT * FROM sih_investigation_timeline
+                WHERE message LIKE ? OR payload LIKE ? OR investigation_id LIKE ?
+                ORDER BY created_at DESC
+                LIMIT 50
+                """,
+                (pattern, pattern, pattern),
+            ).fetchall()
+            timeline = self._rows(timeline_rows)
+
+            # 5. Summary counts
+            all_types = conn.execute(
+                "SELECT DISTINCT finding_type, count(*) as cnt FROM sih_findings GROUP BY finding_type"
+            ).fetchall()
+            type_counts = {r["finding_type"]: r["cnt"] for r in all_types}
+
+            return {
+                "query": q,
+                "finding_type": finding_type,
+                "findings": findings,
+                "relationships": relationships,
+                "timeline": timeline,
+                "type_counts": type_counts,
+                "total_findings": len(findings),
+                "total_relationships": len(relationships),
+            }
 
     # ------------------------------------------------------------------
     # Generic compatibility helpers

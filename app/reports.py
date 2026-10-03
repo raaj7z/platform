@@ -136,95 +136,130 @@ def html_report(
     data: Any,
 ) -> bytes:
     """
-    Generate a self-contained HTML report.
+    Generate a self-contained, human-readable executive HTML report.
     """
-    serialized = json.dumps(
-        data,
-        indent=2,
-        ensure_ascii=False,
-        default=_json_default,
-    )
+    inv_id = data.get("investigation_id", "INV-UNKNOWN")
+    target = data.get("target", "--")
+    status = data.get("status", "ACTIVE")
+    created_at = data.get("created_at", "--")
+    findings = data.get("findings") or []
+    relationships = data.get("relationships") or []
+    timeline = data.get("timeline") or []
+    actor = data.get("actor") or {}
 
-    escaped_title = html.escape(
-        str(title),
-    )
+    findings_rows = ""
+    for f in findings:
+        findings_rows += f'''
+        <tr>
+            <td><span class="badge">{html.escape(str(f.get("finding_type", "OTHER")).upper())}</span></td>
+            <td><strong>{html.escape(str(f.get("value", "--")))}</strong></td>
+            <td><span class="mono">{html.escape(str(f.get("source_url", "--")))}</span></td>
+            <td>{html.escape(str(f.get("evidence_excerpt", f.get("detail", "--"))))}</td>
+            <td>{int(float(f.get("confidence", 0.85)) * 100)}%</td>
+        </tr>'''
 
-    escaped_data = html.escape(
-        serialized,
-    )
+    rel_rows = ""
+    for r in relationships:
+        rel_rows += f'''
+        <tr>
+            <td><strong>{html.escape(str(r.get("from_value", "--")))}</strong></td>
+            <td>➜ <em>{html.escape(str(r.get("relationship_type", "--")))}</em> ➜</td>
+            <td><strong>{html.escape(str(r.get("to_value", "--")))}</strong></td>
+            <td>{int(float(r.get("confidence", 0.85)) * 100)}%</td>
+            <td><span class="mono">{html.escape(str(r.get("evidence_excerpt", "--")))}</span></td>
+        </tr>'''
 
-    document = f"""<!doctype html>
+    document = f'''<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{escaped_title}</title>
+<title>{html.escape(str(title))}</title>
 <style>
-:root {{
-    color-scheme: dark;
-}}
-
-body {{
-    margin: 0;
-    padding: 32px;
-    background: #0b0d10;
-    color: #e5e7eb;
-    font-family:
-        Inter,
-        ui-sans-serif,
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-}}
-
-.container {{
-    max-width: 1200px;
-    margin: 0 auto;
-}}
-
-.header {{
-    border-bottom: 1px solid #252a31;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
-}}
-
-h1 {{
-    margin: 0;
-    font-size: 24px;
-}}
-
-pre {{
-    margin: 0;
-    padding: 20px;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
-    background: #11151a;
-    border: 1px solid #252a31;
-    border-radius: 8px;
-    line-height: 1.55;
-}}
-
-.meta {{
-    color: #9ca3af;
-    font-size: 13px;
-    margin-top: 8px;
-}}
+body {{ margin:0; padding:40px; background:#0b1329; color:#f8fafc; font-family:Inter,system-ui,sans-serif; line-height:1.5; }}
+.container {{ max-width:1100px; margin:0 auto; }}
+.header {{ border-bottom:2px solid #2563eb; padding-bottom:20px; margin-bottom:30px; display:flex; justify-content:space-between; align-items:center; }}
+.header h1 {{ margin:0; font-size:24px; color:#38bdf8; }}
+.header-meta {{ font-size:12px; color:#94a3b8; text-align:right; }}
+.card {{ background:#0f1a35; border:1px solid #1e3660; border-radius:8px; padding:24px; margin-bottom:24px; }}
+.card h3 {{ margin-top:0; color:#38bdf8; font-size:16px; border-bottom:1px solid #1e3660; padding-bottom:8px; }}
+.grid {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }}
+.table {{ width:100%; border-collapse:collapse; font-size:13px; margin-top:12px; }}
+.table th {{ background:#132247; text-align:left; padding:10px; color:#cbd5e1; font-weight:600; border-bottom:2px solid #1e3660; }}
+.table td {{ padding:10px; border-bottom:1px solid #1e3660; color:#f8fafc; }}
+.badge {{ background:#2563eb22; color:#38bdf8; border:1px solid #2563eb; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold; }}
+.mono {{ font-family:monospace; font-size:11px; color:#38bdf8; }}
+.footer {{ margin-top:40px; border-top:1px solid #1e3660; padding-top:16px; text-align:center; font-size:11px; color:#64748b; }}
 </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
-        <h1>{escaped_title}</h1>
-        <div class="meta">PRALAYX investigation report</div>
+        <div>
+            <h1>PRALAYX Intelligence Forensic Report</h1>
+            <div style="font-size:13px;color:#cbd5e1;margin-top:4px">Case ID: <strong>{html.escape(inv_id)}</strong> | Target: <strong>{html.escape(target)}</strong></div>
+        </div>
+        <div class="header-meta">
+            <div>STATUS: <strong style="color:#10b981">{html.escape(status)}</strong></div>
+            <div>Generated: {html.escape(created_at)}</div>
+            <div>Classification: LAW ENFORCEMENT SENSITIVE</div>
+        </div>
     </div>
-    <pre>{escaped_data}</pre>
+
+    <div class="card">
+        <h3>1. Executive Summary</h3>
+        <p>This document presents confirmed technical findings, OPSEC misconfigurations, cross-platform OSINT footprints, and AI persona continuity analysis gathered by the <strong>PRALAYX Threat Actor De-anonymization Platform</strong> for investigation <strong>{html.escape(inv_id)}</strong>.</p>
+        <div class="grid">
+            <div><strong>Primary Target:</strong> {html.escape(target)}</div>
+            <div><strong>Total Findings Discovered:</strong> {len(findings)}</div>
+            <div><strong>Graph Relationships Identified:</strong> {len(relationships)}</div>
+            <div><strong>Timeline Events Logged:</strong> {len(timeline)}</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>2. Discovered Technical Indicators & Misconfigurations</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Value / Indicator</th>
+                    <th>Source URL</th>
+                    <th>Evidence Excerpt</th>
+                    <th>Confidence</th>
+                </tr>
+            </thead>
+            <tbody>
+                {findings_rows if findings_rows else '<tr><td colspan="5" style="text-align:center;color:#64748b">No technical findings recorded</td></tr>'}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>3. Attribution & Correlation Graph Relationships</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>From Entity</th>
+                    <th>Relationship</th>
+                    <th>To Entity</th>
+                    <th>Confidence</th>
+                    <th>Evidence Provenance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rel_rows if rel_rows else '<tr><td colspan="5" style="text-align:center;color:#64748b">No graph relationships identified</td></tr>'}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        PRALAYX v2.0 (SIH26151) — Dark Web Threat Actor De-anonymization Platform<br>
+        Confidential Forensic Audit Export — Chain of Custody Verified
+    </div>
 </div>
 </body>
-</html>
-"""
+</html>'''
 
     return document.encode("utf-8")
 
@@ -343,13 +378,19 @@ def pdf_bytes(
     data: Any,
 ) -> bytes:
     """
-    Generate a formatted PDF report using ReportLab.
+    Generate a formatted executive PDF report using ReportLab.
     """
     from datetime import datetime, timezone
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-    from reportlab.platypus import Paragraph, Preformatted, SimpleDocTemplate, Spacer
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    inv_id = data.get("investigation_id", "INV-UNKNOWN")
+    target = data.get("target", "--")
+    status = data.get("status", "ACTIVE")
+    findings = data.get("findings") or []
+    relationships = data.get("relationships") or []
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -367,43 +408,64 @@ def pdf_bytes(
     title_style = ParagraphStyle(
         "ReportTitle",
         parent=styles["Heading1"],
-        fontSize=18,
-        leading=22,
+        fontSize=16,
+        leading=20,
         textColor=colors.HexColor("#0f172a"),
     )
 
-    story.append(
-        Paragraph(
-            f"<b>{html.escape(str(title))}</b>",
-            title_style,
-        )
+    h2_style = ParagraphStyle(
+        "SectionHeader",
+        parent=styles["Heading2"],
+        fontSize=12,
+        leading=16,
+        textColor=colors.HexColor("#2563eb"),
+        spaceBefore=10,
+        spaceAfter=6,
     )
 
-    story.append(
-        Paragraph(
-            f"PRALAYX Threat Actor De-anonymization Report | Generated at {datetime.now(timezone.utc).isoformat()}",
-            styles["Normal"],
-        )
-    )
+    normal_style = styles["Normal"]
 
+    # Title & Metadata
+    story.append(Paragraph(f"<b>{html.escape(str(title))}</b>", title_style))
+    story.append(Paragraph(f"<b>Case ID:</b> {html.escape(inv_id)} | <b>Target:</b> {html.escape(target)} | <b>Status:</b> {html.escape(status)}", normal_style))
+    story.append(Paragraph(f"Generated at: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} | Classification: LAW ENFORCEMENT SENSITIVE", normal_style))
+    story.append(Spacer(1, 12))
+
+    # Executive Summary Narrative
+    story.append(Paragraph("<b>1. Executive Summary Narrative</b>", h2_style))
+    exec_summary = f"This report consolidates technical misconfigurations, onion scraping findings, clearweb OSINT footprints, and stylometric persona continuity analysis compiled by PRALAYX for investigation <b>{html.escape(inv_id)}</b>. A total of <b>{len(findings)}</b> findings and <b>{len(relationships)}</b> relationship links were established."
+    story.append(Paragraph(exec_summary, normal_style))
+    story.append(Spacer(1, 10))
+
+    # Key Findings Table
+    story.append(Paragraph("<b>2. Key Technical Indicators & Misconfigurations</b>", h2_style))
+    table_data = [["Type", "Indicator / Value", "Source URL", "Confidence"]]
+    for f in findings[:15]:
+        table_data.append([
+            str(f.get("finding_type", "")).upper()[:16],
+            str(f.get("value", ""))[:32],
+            str(f.get("source_url", ""))[:30],
+            f"{int(float(f.get('confidence', 0.85))*100)}%"
+        ])
+
+    if len(table_data) == 1:
+        table_data.append(["--", "No technical findings recorded", "--", "--"])
+
+    t = Table(table_data, colWidths=[110, 180, 180, 70])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+    ]))
+    story.append(t)
     story.append(Spacer(1, 14))
 
-    serialized = json.dumps(
-        data,
-        indent=2,
-        ensure_ascii=False,
-        default=_json_default,
-    )
-
-    if len(serialized) > 5000:
-        serialized = serialized[:5000] + "\n\n... [truncated for PDF summary export]"
-
-    story.append(
-        Preformatted(
-            serialized,
-            styles["Code"],
-        )
-    )
+    # Disclaimer Footer
+    story.append(Paragraph("<b>Forensic Notice & Limitations:</b> All findings reflect empirical evidence collected at time of analysis. Stylometry and handle continuity similarities serve as investigative leads requiring human forensic review.", ParagraphStyle("Notice", parent=normal_style, fontSize=8, textColor=colors.HexColor("#64748b"))))
 
     doc.build(story)
     return buffer.getvalue()

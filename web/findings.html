@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PRALAYX — Evidence Vault</title>
+  <link rel="stylesheet" href="/web/app.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar"><!-- Nav rendered by app.js --></aside>
+    <main class="main">
+      <div id="investigation-context-root"></div>
+
+      <div class="header-title" style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div>
+          <span class="kicker">FORENSIC ARTIFACTS</span>
+          <h1>Cryptographic Evidence Vault</h1>
+          <p>Cryptographically hashed records of all collected dark web artifacts, TLS certificates, and actor handles.</p>
+        </div>
+        <span id="vault-count" class="badge blue">LOADING...</span>
+      </div>
+
+      <section class="panel">
+        <div class="table-container">
+          <table class="table">
+            <thead><tr><th>Finding ID</th><th>Investigation</th><th>Type</th><th>Observable Value</th><th>Confidence</th><th>Source URL</th><th>Recorded</th></tr></thead>
+            <tbody id="findings-tbody">
+              <tr><td colspan="6"><div class="skeleton skeleton-line wide"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/web/app.js"></script>
+</body>
+</html>
