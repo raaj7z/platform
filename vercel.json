@@ -13,7 +13,7 @@
   "routes": [
     {
       "src": "/web/(.*)",
-      "dest": "/web/$1"
+      "dest": "/web/"
     },
     {
       "src": "/api/(.*)",
@@ -21,7 +21,7 @@
     },
     {
       "src": "/",
-      "dest": "app/main.py"
+      "dest": "/web/index.html"
     },
     {
       "src": "/(.*)",
