@@ -42,7 +42,7 @@ else:
             "data/pralayx.db",
         )
     )
-
+VERCEL_DEMO_MODE = bool(os.getenv("VERCEL"))
 
 # ---------------------------------------------------------------------------
 # Shared schema
