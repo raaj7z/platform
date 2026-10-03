@@ -41,6 +41,7 @@ import sys
 import traceback
 from pathlib import Path
 from typing import Any
+from app.config import CRAWLER_PATH
 
 
 # ============================================================
@@ -55,12 +56,7 @@ def load_crawler():
     PRALAYX controls it through service.py.
     """
 
-    root = os.getenv(
-        "CRAWLER_PATH",
-        "../DarkWeb-Deanonymization",
-    )
-
-    root = os.path.abspath(root)
+    root = os.path.abspath(CRAWLER_PATH)
 
     src = os.path.join(root, "src")
 
