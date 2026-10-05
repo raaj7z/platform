@@ -1730,17 +1730,18 @@ async function stylometryPage() {
               .slice(0, 10)
               .map(rel => {
                 const source =
-                  rel.source_entity_id ||
-                  rel.source ||
-                  rel.from ||
-                  "Unknown";
+  rel.from_value ||
+  rel.source_entity_id ||
+  rel.source ||
+  rel.from ||
+  "Unknown";
 
-                const target =
-                  rel.target_entity_id ||
-                  rel.target ||
-                  rel.to ||
-                  "Unknown";
-
+const target =
+  rel.to_value ||
+  rel.target_entity_id ||
+  rel.target ||
+  rel.to ||
+  "Unknown";
                 const type =
                   rel.relationship_type ||
                   rel.type ||
