@@ -993,19 +993,35 @@ async function stylometryPage() {
 
   const invId = new URLSearchParams(location.search).get("id") || "";
 
+  /*
+   * Existing PRALAYX Persona comparison workflow.
+   *
+   * This keeps the existing /api/persona/compare endpoint and UI.
+   * The important change is that returned AI analysis is surfaced when
+   * the Persona service provides it, without inventing fallback scores.
+   */
+
   btn.onclick = async () => {
     const textA = document.getElementById("persona-text-a")?.value?.trim();
     const textB = document.getElementById("persona-text-b")?.value?.trim();
 
     if (!textA || !textB) {
-      alert("Please provide both Reference Text A and Candidate Text B for stylometric comparison.");
+      alert(
+        "Please provide both Reference Text A and Candidate Text B for stylometric comparison."
+      );
       return;
     }
 
     btn.disabled = true;
     btn.textContent = "Analyzing Linguistic Patterns...";
     resultsEl.classList.remove("hidden");
-    resultsEl.innerHTML = `<div class="panel-pad"><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line med"></div></div>`;
+
+    resultsEl.innerHTML = `
+      <div class="panel-pad">
+        <div class="skeleton skeleton-line wide"></div>
+        <div class="skeleton skeleton-line med"></div>
+        <div class="skeleton skeleton-line" style="width:70%"></div>
+      </div>`;
 
     try {
       const payload = {
@@ -1020,42 +1036,453 @@ async function stylometryPage() {
         body: JSON.stringify(payload)
       });
 
-      const sim = Math.round((res.similarity_score || res.overall_similarity || res.confidence || 0.78) * 100);
-      const isMatch = sim >= 70;
+      /*
+       * Never manufacture a similarity score.
+       * Different Persona versions may expose different field names.
+       */
+      const rawSimilarity =
+        res.similarity_score ??
+        res.overall_similarity ??
+        res.confidence ??
+        null;
+
+      const similarity =
+        typeof rawSimilarity === "number"
+          ? Math.round(rawSimilarity * 100)
+          : null;
+
+      const metricValue = value => {
+        if (typeof value !== "number") return "—";
+        return `${Math.round(value * 100)}%`;
+      };
+
+      const lexical =
+        res.lexical_similarity ??
+        res.style_similarity ??
+        res.signals?.style_similarity ??
+        null;
+
+      const syntactic =
+        res.syntactic_similarity ??
+        res.punctuation_similarity ??
+        res.signals?.syntactic_similarity ??
+        null;
+
+      const slang =
+        res.slang_overlap ??
+        res.function_word_similarity ??
+        res.signals?.slang_overlap ??
+        null;
+
+      /*
+       * AI analysis may be returned by the updated Persona comparison
+       * implementation. Keep it optional so classical comparison continues
+       * to work when Gemini is unavailable.
+       */
+      const ai =
+        res.ai_analysis ||
+        res.ai_profile_comparison ||
+        res.ai_comparison ||
+        null;
+
+      const aiStatus = String(
+        ai?.status ||
+        ai?.provider_status ||
+        res.ai_status ||
+        ""
+      ).toUpperCase();
+
+      const aiAvailable =
+        ai &&
+        (
+          aiStatus === "SUCCESS" ||
+          aiStatus === "COMPLETED" ||
+          aiStatus === "AVAILABLE" ||
+          Object.keys(ai).length > 0
+        );
+
+      const sharedCharacteristics =
+        ai?.shared_characteristics ||
+        ai?.common_characteristics ||
+        ai?.similarities ||
+        [];
+
+      const differences =
+        ai?.differences ||
+        ai?.distinguishing_characteristics ||
+        [];
+
+      const aiSummary =
+        ai?.summary ||
+        ai?.assessment ||
+        ai?.explanation ||
+        "";
+
+      const aiProvider =
+        ai?.provider ||
+        res.ai_provider ||
+        "AI linguistic profiler";
+
+      let resultLabel = "INCONCLUSIVE";
+
+      if (similarity !== null) {
+        if (similarity >= 70) {
+          resultLabel = "STRONG STYLISTIC SIMILARITY";
+        } else if (similarity >= 50) {
+          resultLabel = "MODERATE STYLISTIC SIMILARITY";
+        } else {
+          resultLabel = "LOW STYLISTIC SIMILARITY";
+        }
+      }
+
+      const renderList = items => {
+        if (!Array.isArray(items) || !items.length) {
+          return `<span style="color:var(--text-muted)">No additional characteristics returned.</span>`;
+        }
+
+        return `
+          <ul style="margin:6px 0 0 18px;padding:0;color:var(--text-sub);font-size:11.5px;line-height:1.6">
+            ${items
+              .slice(0, 12)
+              .map(item => `<li>${esc(typeof item === "string" ? item : JSON.stringify(item))}</li>`)
+              .join("")}
+          </ul>`;
+      };
 
       resultsEl.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border-line);padding-bottom:12px">
+        <div
+          style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:12px;
+            margin-bottom:16px;
+            border-bottom:1px solid var(--border-line);
+            padding-bottom:12px;
+          "
+        >
           <div>
             <span class="kicker">STYLOMETRIC COMPARISON RESULT</span>
-            <h2 style="margin:2px 0 0 0;font-size:18px;color:var(--text-main)">Attribution Confidence: <span style="color:${isMatch ? 'var(--green)' : 'var(--amber)'}">${sim}%</span></h2>
+
+            <h2
+              style="
+                margin:2px 0 0 0;
+                font-size:18px;
+                color:var(--text-main);
+              "
+            >
+              Stylistic Similarity:
+              <span
+                style="
+                  color:${similarity === null
+                    ? "var(--text-muted)"
+                    : similarity >= 70
+                      ? "var(--green)"
+                      : "var(--amber)"};
+                "
+              >
+                ${similarity === null ? "—" : `${similarity}%`}
+              </span>
+            </h2>
+
+            ${
+              invId
+                ? `<div style="font-size:10.5px;color:var(--text-muted);margin-top:4px">
+                    Investigation: ${esc(invId)}
+                   </div>`
+                : ""
+            }
           </div>
-          <span class="badge ${isMatch ? 'green' : 'amber'}" style="font-size:12px;padding:4px 10px">${isMatch ? 'PROBABLE IDENTICAL AUTHOR' : 'INCONCLUSIVE / DISTINCT'}</span>
+
+          <span
+            class="badge ${
+              similarity === null
+                ? "amber"
+                : similarity >= 70
+                  ? "green"
+                  : "amber"
+            }"
+            style="font-size:11px;padding:4px 10px"
+          >
+            ${esc(resultLabel)}
+          </span>
         </div>
+
+        <div
+          style="
+            margin-bottom:16px;
+            padding:10px 12px;
+            border:1px solid var(--border-line);
+            border-radius:6px;
+            background:var(--bg-main);
+            font-size:11px;
+            color:var(--text-muted);
+            line-height:1.55;
+          "
+        >
+          <strong style="color:var(--text-main)">Interpretation:</strong>
+          This result indicates similarity between the supplied writing
+          samples. It is an analytical lead, not proof of authorship,
+          identity, or real-world attribution.
+        </div>
+
         <div class="grid g3" style="margin-bottom:16px">
+
           <div class="metric-card">
-            <div class="metric-label"><span>VOCABULARY SIMILARITY</span><span>📖</span></div>
-            <div class="metric-value">${Math.round((res.lexical_similarity || 0.82) * 100)}%</div>
-            <div class="metric-sub">Cosine word-vector overlap</div>
+            <div class="metric-label">
+              <span>VOCABULARY / STYLE</span>
+              <span>📖</span>
+            </div>
+
+            <div class="metric-value">
+              ${metricValue(lexical)}
+            </div>
+
+            <div class="metric-sub">
+              Returned lexical/style signal
+            </div>
           </div>
+
           <div class="metric-card">
-            <div class="metric-label"><span>SYNTAX & PUNCTUATION</span><span>⌁</span></div>
-            <div class="metric-value">${Math.round((res.syntactic_similarity || 0.75) * 100)}%</div>
-            <div class="metric-sub">Punctuation & emoji profile</div>
+            <div class="metric-label">
+              <span>SYNTAX / PUNCTUATION</span>
+              <span>⌁</span>
+            </div>
+
+            <div class="metric-value">
+              ${metricValue(syntactic)}
+            </div>
+
+            <div class="metric-sub">
+              Returned structural signal
+            </div>
           </div>
+
           <div class="metric-card">
-            <div class="metric-label"><span>HINGLISH / SLANG OVERLAP</span><span>🇮🇳</span></div>
-            <div class="metric-value">${Math.round((res.slang_overlap || 0.88) * 100)}%</div>
-            <div class="metric-sub">Regional phonetic dialect</div>
+            <div class="metric-label">
+              <span>LANGUAGE / SLANG</span>
+              <span>🗣</span>
+            </div>
+
+            <div class="metric-value">
+              ${metricValue(slang)}
+            </div>
+
+            <div class="metric-sub">
+              Returned language signal
+            </div>
+          </div>
+
+        </div>
+
+        ${
+          aiAvailable
+            ? `
+              <div
+                class="panel panel-pad"
+                style="
+                  margin-bottom:16px;
+                  background:var(--bg-main);
+                  border:1px solid var(--border-line);
+                "
+              >
+                <div
+                  style="
+                    display:flex;
+                    justify-content:space-between;
+                    align-items:center;
+                    gap:10px;
+                    margin-bottom:8px;
+                  "
+                >
+                  <div>
+                    <span class="kicker">AI LINGUISTIC ANALYSIS</span>
+
+                    <h4
+                      style="
+                        margin:2px 0 0 0;
+                        font-size:13px;
+                        color:var(--text-main);
+                      "
+                    >
+                      AI-assisted observable writing comparison
+                    </h4>
+                  </div>
+
+                  <span class="badge green">
+                    ${esc(aiProvider)}
+                  </span>
+                </div>
+
+                ${
+                  aiSummary
+                    ? `
+                      <p
+                        style="
+                          margin:0 0 12px 0;
+                          font-size:12px;
+                          color:var(--text-sub);
+                          line-height:1.6;
+                        "
+                      >
+                        ${esc(aiSummary)}
+                      </p>
+                    `
+                    : ""
+                }
+
+                ${
+                  sharedCharacteristics.length
+                    ? `
+                      <div style="margin-top:10px">
+                        <strong
+                          style="
+                            font-size:11.5px;
+                            color:var(--text-main);
+                          "
+                        >
+                          Shared observable characteristics
+                        </strong>
+
+                        ${renderList(sharedCharacteristics)}
+                      </div>
+                    `
+                    : ""
+                }
+
+                ${
+                  differences.length
+                    ? `
+                      <div style="margin-top:12px">
+                        <strong
+                          style="
+                            font-size:11.5px;
+                            color:var(--text-main);
+                          "
+                        >
+                          Distinguishing characteristics
+                        </strong>
+
+                        ${renderList(differences)}
+                      </div>
+                    `
+                    : ""
+                }
+
+                <div
+                  style="
+                    margin-top:12px;
+                    padding-top:9px;
+                    border-top:1px solid var(--border-line);
+                    font-size:10.5px;
+                    color:var(--text-muted);
+                    line-height:1.5;
+                  "
+                >
+                  AI analysis describes observable linguistic
+                  characteristics. It does not establish a person's identity
+                  or authorship.
+                </div>
+              </div>
+            `
+            : `
+              <div
+                class="panel panel-pad"
+                style="
+                  margin-bottom:16px;
+                  background:var(--bg-main);
+                  border:1px solid var(--border-line);
+                "
+              >
+                <span class="kicker">AI LINGUISTIC ANALYSIS</span>
+
+                <h4
+                  style="
+                    margin:2px 0 6px 0;
+                    font-size:13px;
+                    color:var(--text-main);
+                  "
+                >
+                  AI augmentation unavailable
+                </h4>
+
+                <p
+                  style="
+                    margin:0;
+                    font-size:11.5px;
+                    color:var(--text-sub);
+                    line-height:1.55;
+                  "
+                >
+                  The comparison response did not contain an AI linguistic
+                  analysis. Classical stylometric results shown above are
+                  retained. This does not mean that AI analysis failed; it
+                  means no AI result was returned by the current Persona
+                  service.
+                </p>
+              </div>
+            `
+        }
+
+        <div
+          class="panel panel-pad"
+          style="
+            background:var(--bg-main);
+            border:1px solid var(--border-line);
+          "
+        >
+          <h4
+            style="
+              margin:0 0 6px 0;
+              font-size:12.5px;
+              color:var(--text-main);
+            "
+          >
+            Analytical Forensic Assessment
+          </h4>
+
+          <p
+            style="
+              margin:0;
+              font-size:12px;
+              color:var(--text-sub);
+              line-height:1.6;
+            "
+          >
+            ${esc(
+              res.assessment ||
+              res.summary ||
+              (
+                similarity !== null
+                  ? `The supplied writing samples produced a measured stylistic similarity of ${similarity}%. Review the underlying evidence and source samples before drawing any attribution conclusion.`
+                  : "The Persona service returned a comparison without a directly usable overall similarity score."
+              )
+            )}
+          </p>
+
+          <div
+            style="
+              margin-top:10px;
+              padding-top:9px;
+              border-top:1px solid var(--border-line);
+              font-size:10.5px;
+              color:var(--text-muted);
+              line-height:1.5;
+            "
+          >
+            Persona analysis is a decision-support signal. Similarity alone
+            must not be presented as confirmed identity or proof of common
+            authorship.
           </div>
         </div>
-        <div class="panel panel-pad" style="background:var(--bg-main);border:1px solid var(--border-line)">
-          <h4 style="margin:0 0 6px 0;font-size:12.5px;color:var(--text-main)">Analytical Forensic Assessment</h4>
-          <p style="margin:0;font-size:12px;color:var(--text-sub);line-height:1.6">
-            ${esc(res.assessment || res.summary || `Extracted stylistic n-grams, sentence structure length, and unique emoji distributions show an attribution correlation of ${sim}%. Writing styles demonstrate consistent behavioral traits across dark web and clearnet samples.`)}
-          </p>
+      `;
+
+    } catch (err) {
+      resultsEl.innerHTML = `
+        <div class="error-state">
+          <div class="error-icon">⚠️</div>
+          Comparison failed: ${esc(err.message)}
         </div>`;
-    } catch(err) {
-      resultsEl.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div>Comparison failed: ${esc(err.message)}</div>`;
     } finally {
       btn.disabled = false;
       btn.textContent = "⚡ Execute Stylometric Comparison";
