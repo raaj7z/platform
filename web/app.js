@@ -986,230 +986,1401 @@ async function loadOsintHistory(invId) {
 // ------------------------------------------------------------------
 // 4. PERSONA COMPARISON WORKSTATION (/web/stylometry.html)
 // ------------------------------------------------------------------
+
 async function stylometryPage() {
   const btn = document.getElementById("btn-compare-personas");
   const resultsEl = document.getElementById("persona-compare-results");
-  if (!btn || !resultsEl) return;
 
-  const invId = new URLSearchParams(location.search).get("id") || "";
+  const automaticContent = document.getElementById(
+    "persona-automatic-content"
+  );
+  const automaticSummary = document.getElementById(
+    "persona-automatic-summary"
+  );
+  const automaticBadge = document.getElementById(
+    "persona-data-badge"
+  );
+
+  const migrationContent = document.getElementById(
+    "persona-migration-content"
+  );
+  const migrationSummary = document.getElementById(
+    "persona-migration-summary"
+  );
+  const migrationBadge = document.getElementById(
+    "persona-migration-badge"
+  );
+
+  const engineStatus = document.getElementById(
+    "persona-engine-status"
+  );
+
+  const invId =
+    new URLSearchParams(location.search).get("id") || "";
 
   /*
-   * Existing PRALAYX Persona comparison workflow.
-   *
-   * This keeps the existing /api/persona/compare endpoint and UI.
-   * The important change is that returned AI analysis is surfaced when
-   * the Persona service provides it, without inventing fallback scores.
+   * ------------------------------------------------------------
+   * Helpers
+   * ------------------------------------------------------------
    */
 
-  btn.onclick = async () => {
-    const textA = document.getElementById("persona-text-a")?.value?.trim();
-    const textB = document.getElementById("persona-text-b")?.value?.trim();
+  const safeNumber = value => {
+    return typeof value === "number" && Number.isFinite(value)
+      ? value
+      : null;
+  };
 
-    if (!textA || !textB) {
-      alert(
-        "Please provide both Reference Text A and Candidate Text B for stylometric comparison."
-      );
+  const formatPercent = value => {
+    const n = safeNumber(value);
+
+    if (n === null) return "—";
+
+    return `${Math.round(n * 100)}%`;
+  };
+
+  const formatValue = value => {
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return "—";
+    }
+
+    if (typeof value === "object") {
+      try {
+        return JSON.stringify(value);
+      } catch (_) {
+        return String(value);
+      }
+    }
+
+    return String(value);
+  };
+
+  const listHtml = items => {
+    if (!Array.isArray(items) || items.length === 0) {
+      return `
+        <div style="
+          color:var(--text-muted);
+          font-size:11px;
+        ">
+          No additional data returned.
+        </div>`;
+    }
+
+    return `
+      <ul style="
+        margin:6px 0 0 18px;
+        padding:0;
+        color:var(--text-sub);
+        font-size:11.5px;
+        line-height:1.65;
+      ">
+        ${items
+          .slice(0, 15)
+          .map(item => {
+            const value =
+              typeof item === "string"
+                ? item
+                : formatValue(item);
+
+            return `<li>${esc(value)}</li>`;
+          })
+          .join("")}
+      </ul>`;
+  };
+
+  const setBadge = (element, text, cls = "blue") => {
+    if (!element) return;
+
+    element.className = `badge ${cls}`;
+    element.textContent = text;
+  };
+
+  /*
+   * ------------------------------------------------------------
+   * Automatic investigation Persona analysis
+   * ------------------------------------------------------------
+   */
+
+  async function loadAutomaticPersona() {
+    if (!automaticContent) return;
+
+    if (!invId) {
+      setBadge(automaticBadge, "NO INVESTIGATION", "amber");
+
+      if (automaticSummary) {
+        automaticSummary.textContent =
+          "Open this page from a specific investigation to load Persona evidence.";
+      }
+
+      automaticContent.innerHTML = `
+        <div class="empty" style="padding:20px">
+          No investigation was selected.
+        </div>
+      `;
+
       return;
     }
 
-    btn.disabled = true;
-    btn.textContent = "Analyzing Linguistic Patterns...";
-    resultsEl.classList.remove("hidden");
-
-    resultsEl.innerHTML = `
-      <div class="panel-pad">
-        <div class="skeleton skeleton-line wide"></div>
-        <div class="skeleton skeleton-line med"></div>
-        <div class="skeleton skeleton-line" style="width:70%"></div>
-      </div>`;
-
     try {
-      const payload = {
-        reference_text: textA,
-        candidate_text: textB,
-        investigation_id: invId || null
-      };
+      setBadge(automaticBadge, "LOADING", "blue");
 
-      const res = await api("/api/persona/compare", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+      const investigation = await api(
+        `/api/investigations/${encodeURIComponent(invId)}`
+      );
+
+      if (!investigation) {
+        throw new Error("Investigation data was not returned.");
+      }
+
+      /*
+       * The Platform investigation endpoint is the existing source
+       * of truth. Do not invent a separate Persona endpoint here.
+       */
+
+      const findings =
+        Array.isArray(investigation.findings)
+          ? investigation.findings
+          : [];
+
+      const evidence =
+        Array.isArray(investigation.evidence)
+          ? investigation.evidence
+          : [];
+
+      const personaFindings = findings.filter(f => {
+        const type = String(
+          f.finding_type ||
+          f.type ||
+          f.category ||
+          ""
+        ).toLowerCase();
+
+        const source = String(
+          f.source ||
+          f.module ||
+          f.source_module ||
+          ""
+        ).toLowerCase();
+
+        return (
+          type.includes("persona") ||
+          type.includes("stylometr") ||
+          type.includes("linguistic") ||
+          type.includes("behavior") ||
+          source.includes("persona") ||
+          source.includes("stylometr")
+        );
+      });
+
+      const personaEvidence = evidence.filter(e => {
+        const type = String(
+          e.evidence_type ||
+          e.type ||
+          e.category ||
+          ""
+        ).toLowerCase();
+
+        const source = String(
+          e.source_module ||
+          e.source ||
+          ""
+        ).toLowerCase();
+
+        return (
+          type.includes("persona") ||
+          type.includes("stylometr") ||
+          type.includes("linguistic") ||
+          type.includes("behavior") ||
+          source.includes("persona") ||
+          source.includes("stylometr")
+        );
       });
 
       /*
-       * Never manufacture a similarity score.
-       * Different Persona versions may expose different field names.
+       * Some versions of the investigation response may expose
+       * a profile directly. Use it when actually present.
        */
-      const rawSimilarity =
-        res.similarity_score ??
-        res.overall_similarity ??
-        res.confidence ??
+      const profile =
+        investigation.persona_profile ||
+        investigation.persona ||
+        investigation.profile ||
         null;
 
-      const similarity =
-        typeof rawSimilarity === "number"
-          ? Math.round(rawSimilarity * 100)
+      const stylometry =
+        profile?.stylometry ||
+        profile?.features ||
+        null;
+
+      const aiProfile =
+        profile?.ai_profile ||
+        profile?.ai_linguistic_profile ||
+        null;
+
+      const hasData =
+        personaFindings.length > 0 ||
+        personaEvidence.length > 0 ||
+        !!profile;
+
+      if (!hasData) {
+        setBadge(automaticBadge, "NO PERSONA DATA", "amber");
+
+        if (automaticSummary) {
+          automaticSummary.textContent =
+            "No persisted Persona analysis was found for this investigation.";
+        }
+
+        automaticContent.innerHTML = `
+          <div
+            class="panel"
+            style="
+              background:var(--bg-main);
+              border:1px solid var(--border-line);
+              padding:14px;
+            "
+          >
+            <div style="
+              font-size:12px;
+              color:var(--text-main);
+              font-weight:600;
+              margin-bottom:5px;
+            ">
+              Persona analysis not available
+            </div>
+
+            <div style="
+              font-size:11.5px;
+              color:var(--text-muted);
+              line-height:1.55;
+            ">
+              This investigation does not currently contain persisted
+              Persona/stylometry evidence. No synthetic score or placeholder
+              result is being displayed.
+            </div>
+          </div>
+        `;
+
+        return;
+      }
+
+      setBadge(automaticBadge, "DATA AVAILABLE", "green");
+
+      if (automaticSummary) {
+        automaticSummary.textContent =
+          `Persona evidence associated with investigation ${invId}.`;
+      }
+
+      const confidenceValues = personaFindings
+        .map(f =>
+          safeNumber(
+            f.confidence ??
+            f.score ??
+            f.similarity
+          )
+        )
+        .filter(v => v !== null);
+
+      const bestConfidence =
+        confidenceValues.length > 0
+          ? Math.max(...confidenceValues)
           : null;
 
-      const metricValue = value => {
-        if (typeof value !== "number") return "—";
-        return `${Math.round(value * 100)}%`;
-      };
+      const findingRows = personaFindings
+        .slice(0, 12)
+        .map(f => {
+          const type =
+            f.finding_type ||
+            f.type ||
+            f.category ||
+            "Persona finding";
 
-      const lexical =
-        res.lexical_similarity ??
-        res.style_similarity ??
-        res.signals?.style_similarity ??
-        null;
+          const value =
+            f.value ||
+            f.finding_value ||
+            f.description ||
+            "—";
 
-      const syntactic =
-        res.syntactic_similarity ??
-        res.punctuation_similarity ??
-        res.signals?.syntactic_similarity ??
-        null;
+          const confidence =
+            safeNumber(
+              f.confidence ??
+              f.score ??
+              f.similarity
+            );
 
-      const slang =
-        res.slang_overlap ??
-        res.function_word_similarity ??
-        res.signals?.slang_overlap ??
-        null;
+          const source =
+            f.source_url ||
+            f.source ||
+            f.source_module ||
+            "—";
+
+          return `
+            <tr>
+              <td>
+                <span class="badge blue">
+                  ${esc(String(type).toUpperCase())}
+                </span>
+              </td>
+
+              <td style="
+                font-size:11.5px;
+                color:var(--text-main);
+              ">
+                ${esc(formatValue(value))}
+              </td>
+
+              <td style="
+                font-size:11px;
+                color:var(--text-sub);
+              ">
+                ${
+                  confidence === null
+                    ? "—"
+                    : `${Math.round(confidence * 100)}%`
+                }
+              </td>
+
+              <td style="
+                font-size:10.5px;
+                color:var(--text-muted);
+              ">
+                ${esc(formatValue(source))}
+              </td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      automaticContent.innerHTML = `
+        ${
+          profile
+            ? `
+              <div
+                class="grid g3"
+                style="margin-bottom:14px"
+              >
+
+                <div class="metric-card">
+                  <div class="metric-label">
+                    <span>PERSONA FINDINGS</span>
+                    <span>◎</span>
+                  </div>
+
+                  <div class="metric-value">
+                    ${personaFindings.length}
+                  </div>
+
+                  <div class="metric-sub">
+                    Persisted investigation findings
+                  </div>
+                </div>
+
+                <div class="metric-card">
+                  <div class="metric-label">
+                    <span>PERSONA EVIDENCE</span>
+                    <span>◉</span>
+                  </div>
+
+                  <div class="metric-value">
+                    ${personaEvidence.length}
+                  </div>
+
+                  <div class="metric-sub">
+                    Associated evidence records
+                  </div>
+                </div>
+
+                <div class="metric-card">
+                  <div class="metric-label">
+                    <span>ANALYSIS CONFIDENCE</span>
+                    <span>△</span>
+                  </div>
+
+                  <div class="metric-value">
+                    ${
+                      bestConfidence === null
+                        ? "—"
+                        : `${Math.round(bestConfidence * 100)}%`
+                    }
+                  </div>
+
+                  <div class="metric-sub">
+                    Highest returned finding score
+                  </div>
+                </div>
+
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          stylometry
+            ? `
+              <div
+                class="panel"
+                style="
+                  background:var(--bg-main);
+                  border:1px solid var(--border-line);
+                  padding:14px;
+                  margin-bottom:14px;
+                "
+              >
+                <span class="kicker">
+                  CLASSICAL STYLOMETRY
+                </span>
+
+                <h4 style="
+                  margin:3px 0 10px;
+                  font-size:13px;
+                  color:var(--text-main);
+                ">
+                  Observable writing-style features
+                </h4>
+
+                <div style="
+                  display:grid;
+                  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+                  gap:8px;
+                ">
+                  ${Object.entries(stylometry)
+                    .slice(0, 12)
+                    .map(([key, value]) => `
+                      <div style="
+                        padding:9px;
+                        border:1px solid var(--border-line);
+                        border-radius:6px;
+                      ">
+                        <div style="
+                          font-size:9.5px;
+                          color:var(--text-muted);
+                          text-transform:uppercase;
+                        ">
+                          ${esc(
+                            String(key)
+                              .replace(/_/g, " ")
+                          )}
+                        </div>
+
+                        <div style="
+                          margin-top:4px;
+                          font-size:12px;
+                          color:var(--text-main);
+                          word-break:break-word;
+                        ">
+                          ${esc(formatValue(value))}
+                        </div>
+                      </div>
+                    `)
+                    .join("")}
+                </div>
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          aiProfile
+            ? `
+              <div
+                class="panel"
+                style="
+                  background:var(--bg-main);
+                  border:1px solid var(--border-line);
+                  padding:14px;
+                  margin-bottom:14px;
+                "
+              >
+                <span class="kicker">
+                  AI LINGUISTIC PROFILE
+                </span>
+
+                <h4 style="
+                  margin:3px 0 8px;
+                  font-size:13px;
+                  color:var(--text-main);
+                ">
+                  AI-assisted observable language analysis
+                </h4>
+
+                ${
+                  aiProfile.summary
+                    ? `
+                      <p style="
+                        margin:0 0 10px;
+                        font-size:11.5px;
+                        color:var(--text-sub);
+                        line-height:1.6;
+                      ">
+                        ${esc(aiProfile.summary)}
+                      </p>
+                    `
+                    : ""
+                }
+
+                ${
+                  Array.isArray(aiProfile.writing_patterns)
+                    ? `
+                      <div style="margin-top:8px">
+                        <strong style="
+                          font-size:11px;
+                          color:var(--text-main);
+                        ">
+                          Writing patterns
+                        </strong>
+
+                        ${listHtml(
+                          aiProfile.writing_patterns
+                        )}
+                      </div>
+                    `
+                    : ""
+                }
+
+                ${
+                  Array.isArray(aiProfile.recurring_terms)
+                    ? `
+                      <div style="margin-top:10px">
+                        <strong style="
+                          font-size:11px;
+                          color:var(--text-main);
+                        ">
+                          Recurring terms
+                        </strong>
+
+                        ${listHtml(
+                          aiProfile.recurring_terms
+                        )}
+                      </div>
+                    `
+                    : ""
+                }
+
+                <div style="
+                  margin-top:10px;
+                  padding-top:9px;
+                  border-top:1px solid var(--border-line);
+                  font-size:10.5px;
+                  color:var(--text-muted);
+                  line-height:1.5;
+                ">
+                  AI output describes observable linguistic
+                  characteristics. It is not an identity determination.
+                </div>
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          findingRows
+            ? `
+              <div
+                class="panel"
+                style="
+                  background:var(--bg-main);
+                  border:1px solid var(--border-line);
+                  overflow:auto;
+                "
+              >
+                <div style="padding:12px 14px 8px">
+                  <span class="kicker">
+                    PERSISTED PERSONA FINDINGS
+                  </span>
+                </div>
+
+                <table style="
+                  width:100%;
+                  border-collapse:collapse;
+                ">
+                  <thead>
+                    <tr>
+                      <th style="text-align:left;padding:8px">
+                        Type
+                      </th>
+                      <th style="text-align:left;padding:8px">
+                        Finding
+                      </th>
+                      <th style="text-align:left;padding:8px">
+                        Score
+                      </th>
+                      <th style="text-align:left;padding:8px">
+                        Source
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    ${findingRows}
+                  </tbody>
+                </table>
+              </div>
+            `
+            : ""
+        }
+
+        <div style="
+          margin-top:12px;
+          padding:10px 12px;
+          border:1px solid var(--border-line);
+          border-radius:6px;
+          font-size:10.5px;
+          color:var(--text-muted);
+          line-height:1.5;
+        ">
+          Persona analysis is an investigative decision-support signal.
+          Similarity or behavioral association must not be presented as
+          confirmed real-world identity.
+        </div>
+      `;
+
+    } catch (err) {
+      setBadge(automaticBadge, "ERROR", "amber");
+
+      if (automaticSummary) {
+        automaticSummary.textContent =
+          "The investigation Persona data could not be loaded.";
+      }
+
+      automaticContent.innerHTML = `
+        <div class="error-state">
+          <div class="error-icon">⚠️</div>
+          Failed to load Persona evidence:
+          ${esc(err.message)}
+        </div>
+      `;
+    }
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * Candidate pseudonymous migration
+   * ------------------------------------------------------------
+   */
+
+  async function loadMigration() {
+    if (!migrationContent) return;
+
+    if (!invId) {
+      setBadge(migrationBadge, "NO INVESTIGATION", "amber");
+
+      if (migrationSummary) {
+        migrationSummary.textContent =
+          "Open this page from a specific investigation to inspect candidate continuity.";
+      }
+
+      migrationContent.innerHTML = `
+        <div class="empty" style="padding:20px">
+          No investigation was selected.
+        </div>
+      `;
+
+      return;
+    }
+
+    try {
+      setBadge(migrationBadge, "CHECKING", "blue");
+
+      const investigation = await api(
+        `/api/investigations/${encodeURIComponent(invId)}`
+      );
+
+      const relationships =
+        Array.isArray(investigation?.relationships)
+          ? investigation.relationships
+          : [];
+
+      const migrationRelationships =
+        relationships.filter(rel => {
+          const type = String(
+            rel.relationship_type ||
+            rel.type ||
+            ""
+          ).toLowerCase();
+
+          return (
+            type.includes("pseudonymous") ||
+            type.includes("migration") ||
+            type.includes("continuity")
+          );
+        });
 
       /*
-       * AI analysis may be returned by the updated Persona comparison
-       * implementation. Keep it optional so classical comparison continues
-       * to work when Gemini is unavailable.
+       * First preference: real investigation relationship data.
        */
-      const ai =
-        res.ai_analysis ||
-        res.ai_profile_comparison ||
-        res.ai_comparison ||
-        null;
-
-      const aiStatus = String(
-        ai?.status ||
-        ai?.provider_status ||
-        res.ai_status ||
-        ""
-      ).toUpperCase();
-
-      const aiAvailable =
-        ai &&
-        (
-          aiStatus === "SUCCESS" ||
-          aiStatus === "COMPLETED" ||
-          aiStatus === "AVAILABLE" ||
-          Object.keys(ai).length > 0
+      if (migrationRelationships.length > 0) {
+        setBadge(
+          migrationBadge,
+          "CANDIDATE LINKS FOUND",
+          "green"
         );
 
-      const sharedCharacteristics =
-        ai?.shared_characteristics ||
-        ai?.common_characteristics ||
-        ai?.similarities ||
-        [];
+        if (migrationSummary) {
+          migrationSummary.textContent =
+            "Candidate continuity relationships associated with this investigation.";
+        }
 
-      const differences =
-        ai?.differences ||
-        ai?.distinguishing_characteristics ||
-        [];
+        migrationContent.innerHTML = `
+          <div style="
+            display:grid;
+            gap:10px;
+          ">
+            ${migrationRelationships
+              .slice(0, 10)
+              .map(rel => {
+                const source =
+                  rel.source_entity_id ||
+                  rel.source ||
+                  rel.from ||
+                  "Unknown";
 
-      const aiSummary =
-        ai?.summary ||
-        ai?.assessment ||
-        ai?.explanation ||
-        "";
+                const target =
+                  rel.target_entity_id ||
+                  rel.target ||
+                  rel.to ||
+                  "Unknown";
 
-      const aiProvider =
-        ai?.provider ||
-        res.ai_provider ||
-        "AI linguistic profiler";
+                const type =
+                  rel.relationship_type ||
+                  rel.type ||
+                  "Candidate relationship";
 
-      let resultLabel = "INCONCLUSIVE";
+                const confidence =
+                  safeNumber(
+                    rel.confidence ??
+                    rel.score
+                  );
 
-      if (similarity !== null) {
-        if (similarity >= 70) {
-          resultLabel = "STRONG STYLISTIC SIMILARITY";
-        } else if (similarity >= 50) {
-          resultLabel = "MODERATE STYLISTIC SIMILARITY";
-        } else {
-          resultLabel = "LOW STYLISTIC SIMILARITY";
+                const explanation =
+                  rel.explanation ||
+                  rel.description ||
+                  "Relationship returned by the investigation data.";
+
+                return `
+                  <div
+                    class="panel"
+                    style="
+                      background:var(--bg-main);
+                      border:1px solid var(--border-line);
+                      padding:13px;
+                    "
+                  >
+                    <div style="
+                      display:flex;
+                      justify-content:space-between;
+                      gap:12px;
+                      align-items:flex-start;
+                      flex-wrap:wrap;
+                    ">
+                      <div>
+                        <span class="badge blue">
+                          ${esc(
+                            String(type).toUpperCase()
+                          )}
+                        </span>
+
+                        <div style="
+                          margin-top:8px;
+                          font-size:13px;
+                          color:var(--text-main);
+                          font-weight:600;
+                        ">
+                          ${esc(formatValue(source))}
+                          <span style="
+                            color:var(--text-muted);
+                            margin:0 6px;
+                          ">→</span>
+                          ${esc(formatValue(target))}
+                        </div>
+                      </div>
+
+                      ${
+                        confidence === null
+                          ? ""
+                          : `
+                            <span class="badge green">
+                              ${Math.round(
+                                confidence * 100
+                              )}%
+                            </span>
+                          `
+                      }
+                    </div>
+
+                    <div style="
+                      margin-top:9px;
+                      font-size:11.5px;
+                      color:var(--text-sub);
+                      line-height:1.55;
+                    ">
+                      ${esc(formatValue(explanation))}
+                    </div>
+                  </div>
+                `;
+              })
+              .join("")}
+          </div>
+
+          <div style="
+            margin-top:12px;
+            font-size:10.5px;
+            color:var(--text-muted);
+            line-height:1.5;
+          ">
+            These are candidate relationships. They do not independently
+            establish that two handles belong to the same real-world person.
+          </div>
+        `;
+
+        return;
+      }
+
+      /*
+       * The hosted demo already has a controlled synthetic migration
+       * demonstration. Use it ONLY for the known demo investigation.
+       *
+       * This prevents synthetic data from appearing inside a normal
+       * investigation.
+       */
+      if (invId === "INV-DEMO-2026") {
+        try {
+          const demo = await api(
+            `/api/persona/synthetic-demo?investigation_id=${encodeURIComponent(invId)}`
+          );
+
+          if (demo && demo.is_synthetic_demo) {
+            setBadge(
+              migrationBadge,
+              "SYNTHETIC DEMO",
+              "amber"
+            );
+
+            if (migrationSummary) {
+              migrationSummary.textContent =
+                "Controlled synthetic demonstration of candidate pseudonymous continuity.";
+            }
+
+            const groupA =
+              demo.sample_group_a || {};
+
+            const groupB =
+              demo.sample_group_b || {};
+
+            const result =
+              demo.analysis_result || {};
+
+            const confidence =
+              safeNumber(
+                result.confidence ??
+                result.score ??
+                result.overall_confidence
+              );
+
+            migrationContent.innerHTML = `
+              <div
+                class="panel"
+                style="
+                  background:var(--bg-main);
+                  border:1px solid var(--border-line);
+                  padding:14px;
+                  margin-bottom:12px;
+                "
+              >
+                <div style="
+                  display:flex;
+                  justify-content:space-between;
+                  gap:12px;
+                  align-items:flex-start;
+                  flex-wrap:wrap;
+                ">
+
+                  <div>
+                    <span class="badge amber">
+                      SYNTHETIC / CONTROLLED
+                    </span>
+
+                    <h3 style="
+                      margin:8px 0 4px;
+                      font-size:15px;
+                      color:var(--text-main);
+                    ">
+                      Candidate Handle Continuity
+                    </h3>
+
+                    <div style="
+                      font-size:11px;
+                      color:var(--text-muted);
+                      line-height:1.5;
+                    ">
+                      ${esc(
+                        demo.disclaimer ||
+                        "Synthetic demonstration data. Not a real-world identity attribution."
+                      )}
+                    </div>
+                  </div>
+
+                  ${
+                    confidence === null
+                      ? ""
+                      : `
+                        <div class="metric-card">
+                          <div class="metric-label">
+                            <span>ANALYTICAL SCORE</span>
+                          </div>
+
+                          <div class="metric-value">
+                            ${Math.round(
+                              confidence * 100
+                            )}%
+                          </div>
+
+                          <div class="metric-sub">
+                            Candidate continuity signal
+                          </div>
+                        </div>
+                      `
+                  }
+
+                </div>
+              </div>
+
+              <div class="grid g2">
+
+                <div
+                  class="panel"
+                  style="
+                    background:var(--bg-main);
+                    border:1px solid var(--border-line);
+                    padding:13px;
+                  "
+                >
+                  <span class="kicker">
+                    EARLIER HANDLE
+                  </span>
+
+                  <h4 style="
+                    margin:4px 0 6px;
+                    font-size:14px;
+                    color:var(--text-main);
+                  ">
+                    ${esc(groupA.handle || "Unknown")}
+                  </h4>
+
+                  <div style="
+                    font-size:11px;
+                    color:var(--text-muted);
+                  ">
+                    ${esc(groupA.period || "—")}
+                    ·
+                    ${esc(
+                      String(
+                        groupA.sample_count ??
+                        0
+                      )
+                    )}
+                    samples
+                  </div>
+                </div>
+
+                <div
+                  class="panel"
+                  style="
+                    background:var(--bg-main);
+                    border:1px solid var(--border-line);
+                    padding:13px;
+                  "
+                >
+                  <span class="kicker">
+                    CANDIDATE HANDLE
+                  </span>
+
+                  <h4 style="
+                    margin:4px 0 6px;
+                    font-size:14px;
+                    color:var(--text-main);
+                  ">
+                    ${esc(groupB.handle || "Unknown")}
+                  </h4>
+
+                  <div style="
+                    font-size:11px;
+                    color:var(--text-muted);
+                  ">
+                    ${esc(groupB.period || "—")}
+                    ·
+                    ${esc(
+                      String(
+                        groupB.sample_count ??
+                        0
+                      )
+                    )}
+                    samples
+                  </div>
+                </div>
+
+              </div>
+
+              <div style="
+                margin-top:12px;
+                padding:10px 12px;
+                border:1px solid var(--border-line);
+                border-radius:6px;
+                font-size:10.5px;
+                color:var(--text-muted);
+                line-height:1.5;
+              ">
+                This demonstration illustrates how multiple observable
+                signals can support a candidate continuity hypothesis.
+                It is not proof that either handle belongs to a particular
+                real-world individual.
+              </div>
+            `;
+
+            return;
+          }
+        } catch (_) {
+          /*
+           * If the optional synthetic endpoint is unavailable,
+           * fall through to the honest no-data state below.
+           */
         }
       }
 
-      const renderList = items => {
-        if (!Array.isArray(items) || !items.length) {
-          return `<span style="color:var(--text-muted)">No additional characteristics returned.</span>`;
-        }
+      setBadge(
+        migrationBadge,
+        "NO CANDIDATE LINKS",
+        "amber"
+      );
 
-        return `
-          <ul style="margin:6px 0 0 18px;padding:0;color:var(--text-sub);font-size:11.5px;line-height:1.6">
-            ${items
-              .slice(0, 12)
-              .map(item => `<li>${esc(typeof item === "string" ? item : JSON.stringify(item))}</li>`)
-              .join("")}
-          </ul>`;
-      };
+      if (migrationSummary) {
+        migrationSummary.textContent =
+          "No candidate pseudonymous continuity relationship was returned for this investigation.";
+      }
 
-      resultsEl.innerHTML = `
+      migrationContent.innerHTML = `
         <div
+          class="panel"
           style="
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            gap:12px;
-            margin-bottom:16px;
-            border-bottom:1px solid var(--border-line);
-            padding-bottom:12px;
+            background:var(--bg-main);
+            border:1px solid var(--border-line);
+            padding:14px;
           "
         >
-          <div>
-            <span class="kicker">STYLOMETRIC COMPARISON RESULT</span>
-
-            <h2
-              style="
-                margin:2px 0 0 0;
-                font-size:18px;
-                color:var(--text-main);
-              "
-            >
-              Stylistic Similarity:
-              <span
-                style="
-                  color:${similarity === null
-                    ? "var(--text-muted)"
-                    : similarity >= 70
-                      ? "var(--green)"
-                      : "var(--amber)"};
-                "
-              >
-                ${similarity === null ? "—" : `${similarity}%`}
-              </span>
-            </h2>
-
-            ${
-              invId
-                ? `<div style="font-size:10.5px;color:var(--text-muted);margin-top:4px">
-                    Investigation: ${esc(invId)}
-                   </div>`
-                : ""
-            }
+          <div style="
+            font-size:12px;
+            color:var(--text-main);
+            font-weight:600;
+            margin-bottom:5px;
+          ">
+            No candidate continuity found
           </div>
 
-          <span
-            class="badge ${
+          <div style="
+            font-size:11.5px;
+            color:var(--text-muted);
+            line-height:1.55;
+          ">
+            No pseudonymous migration or continuity relationship is
+            currently stored for this investigation. No relationship
+            has been invented to populate the demonstration.
+          </div>
+        </div>
+      `;
+
+    } catch (err) {
+      setBadge(migrationBadge, "ERROR", "amber");
+
+      if (migrationSummary) {
+        migrationSummary.textContent =
+          "Candidate continuity could not be loaded.";
+      }
+
+      migrationContent.innerHTML = `
+        <div class="error-state">
+          <div class="error-icon">⚠️</div>
+          Failed to load candidate continuity:
+          ${esc(err.message)}
+        </div>
+      `;
+    }
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * Manual Persona comparison
+   * ------------------------------------------------------------
+   */
+
+  async function setupManualComparison() {
+    if (!btn || !resultsEl) return;
+
+    btn.onclick = async () => {
+      const textA =
+        document
+          .getElementById("persona-text-a")
+          ?.value
+          ?.trim();
+
+      const textB =
+        document
+          .getElementById("persona-text-b")
+          ?.value
+          ?.trim();
+
+      if (!textA || !textB) {
+        alert(
+          "Please provide both Reference Text A and Candidate Text B for stylometric comparison."
+        );
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent =
+        "Analyzing Linguistic Patterns...";
+
+      resultsEl.classList.remove("hidden");
+
+      resultsEl.innerHTML = `
+        <div class="panel-pad">
+          <div class="skeleton skeleton-line wide"></div>
+          <div class="skeleton skeleton-line med"></div>
+          <div
+            class="skeleton skeleton-line"
+            style="width:70%"
+          ></div>
+        </div>
+      `;
+
+      try {
+        const payload = {
+          reference_text: textA,
+          candidate_text: textB,
+          investigation_id: invId || null
+        };
+
+        const res = await api(
+          "/api/persona/compare",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+            body: JSON.stringify(payload)
+          }
+        );
+
+        const rawSimilarity =
+          res.similarity_score ??
+          res.overall_similarity ??
+          res.confidence ??
+          null;
+
+        const similarity =
+          typeof rawSimilarity === "number"
+            ? Math.round(
+                rawSimilarity * 100
+              )
+            : null;
+
+        const metricValue = value => {
+          if (
+            typeof value !== "number"
+          ) {
+            return "—";
+          }
+
+          return `${Math.round(
+            value * 100
+          )}%`;
+        };
+
+        const lexical =
+          res.lexical_similarity ??
+          res.style_similarity ??
+          res.signals?.style_similarity ??
+          null;
+
+        const syntactic =
+          res.syntactic_similarity ??
+          res.punctuation_similarity ??
+          res.signals?.syntactic_similarity ??
+          null;
+
+        const slang =
+          res.slang_overlap ??
+          res.function_word_similarity ??
+          res.signals?.slang_overlap ??
+          null;
+
+        const ai =
+          res.ai_analysis ||
+          res.ai_profile_comparison ||
+          res.ai_comparison ||
+          null;
+
+        const aiStatus =
+          String(
+            ai?.status ||
+            ai?.provider_status ||
+            res.ai_status ||
+            ""
+          ).toUpperCase();
+
+        const aiAvailable =
+          ai &&
+          (
+            aiStatus === "SUCCESS" ||
+            aiStatus === "COMPLETED" ||
+            aiStatus === "AVAILABLE" ||
+            Object.keys(ai).length > 0
+          );
+
+        const sharedCharacteristics =
+          ai?.shared_characteristics ||
+          ai?.common_characteristics ||
+          ai?.similarities ||
+          [];
+
+        const differences =
+          ai?.differences ||
+          ai?.distinguishing_characteristics ||
+          [];
+
+        const aiSummary =
+          ai?.summary ||
+          ai?.assessment ||
+          ai?.explanation ||
+          "";
+
+        const aiProvider =
+          ai?.provider ||
+          res.ai_provider ||
+          "AI linguistic profiler";
+
+        let resultLabel =
+          "INCONCLUSIVE";
+
+        if (similarity !== null) {
+          if (similarity >= 70) {
+            resultLabel =
+              "STRONG STYLISTIC SIMILARITY";
+          } else if (similarity >= 50) {
+            resultLabel =
+              "MODERATE STYLISTIC SIMILARITY";
+          } else {
+            resultLabel =
+              "LOW STYLISTIC SIMILARITY";
+          }
+        }
+
+        const renderList = items => {
+          if (
+            !Array.isArray(items) ||
+            !items.length
+          ) {
+            return `
+              <span style="
+                color:var(--text-muted)
+              ">
+                No additional characteristics returned.
+              </span>
+            `;
+          }
+
+          return `
+            <ul style="
+              margin:6px 0 0 18px;
+              padding:0;
+              color:var(--text-sub);
+              font-size:11.5px;
+              line-height:1.6;
+            ">
+              ${items
+                .slice(0, 12)
+                .map(item => `
+                  <li>
+                    ${esc(
+                      typeof item === "string"
+                        ? item
+                        : JSON.stringify(item)
+                    )}
+                  </li>
+                `)
+                .join("")}
+            </ul>
+          `;
+        };
+
+        resultsEl.innerHTML = `
+          <div
+            style="
+              display:flex;
+              justify-content:space-between;
+              align-items:center;
+              gap:12px;
+              margin-bottom:16px;
+              border-bottom:1px solid var(--border-line);
+              padding-bottom:12px;
+            "
+          >
+            <div>
+              <span class="kicker">
+                STYLOMETRIC COMPARISON RESULT
+              </span>
+
+              <h2 style="
+                margin:2px 0 0;
+                font-size:18px;
+                color:var(--text-main);
+              ">
+                Stylistic Similarity:
+                <span style="
+                  color:${
+                    similarity === null
+                      ? "var(--text-muted)"
+                      : similarity >= 70
+                        ? "var(--green)"
+                        : "var(--amber)"
+                  };
+                ">
+                  ${
+                    similarity === null
+                      ? "—"
+                      : `${similarity}%`
+                  }
+                </span>
+              </h2>
+
+              ${
+                invId
+                  ? `
+                    <div style="
+                      font-size:10.5px;
+                      color:var(--text-muted);
+                      margin-top:4px;
+                    ">
+                      Investigation:
+                      ${esc(invId)}
+                    </div>
+                  `
+                  : ""
+              }
+            </div>
+
+            <span class="badge ${
               similarity === null
                 ? "amber"
                 : similarity >= 70
                   ? "green"
                   : "amber"
-            }"
-            style="font-size:11px;padding:4px 10px"
-          >
-            ${esc(resultLabel)}
-          </span>
-        </div>
+            }">
+              ${esc(resultLabel)}
+            </span>
+          </div>
 
-        <div
-          style="
+          <div style="
             margin-bottom:16px;
             padding:10px 12px;
             border:1px solid var(--border-line);
@@ -1218,276 +2389,280 @@ async function stylometryPage() {
             font-size:11px;
             color:var(--text-muted);
             line-height:1.55;
-          "
-        >
-          <strong style="color:var(--text-main)">Interpretation:</strong>
-          This result indicates similarity between the supplied writing
-          samples. It is an analytical lead, not proof of authorship,
-          identity, or real-world attribution.
-        </div>
+          ">
+            <strong style="
+              color:var(--text-main)
+            ">
+              Interpretation:
+            </strong>
 
-        <div class="grid g3" style="margin-bottom:16px">
-
-          <div class="metric-card">
-            <div class="metric-label">
-              <span>VOCABULARY / STYLE</span>
-              <span>📖</span>
-            </div>
-
-            <div class="metric-value">
-              ${metricValue(lexical)}
-            </div>
-
-            <div class="metric-sub">
-              Returned lexical/style signal
-            </div>
+            This result indicates similarity between the supplied
+            writing samples. It is an analytical lead, not proof
+            of authorship, identity, or real-world attribution.
           </div>
 
-          <div class="metric-card">
-            <div class="metric-label">
-              <span>SYNTAX / PUNCTUATION</span>
-              <span>⌁</span>
+          <div
+            class="grid g3"
+            style="margin-bottom:16px"
+          >
+
+            <div class="metric-card">
+              <div class="metric-label">
+                <span>VOCABULARY / STYLE</span>
+                <span>📖</span>
+              </div>
+
+              <div class="metric-value">
+                ${metricValue(lexical)}
+              </div>
+
+              <div class="metric-sub">
+                Returned lexical/style signal
+              </div>
             </div>
 
-            <div class="metric-value">
-              ${metricValue(syntactic)}
+            <div class="metric-card">
+              <div class="metric-label">
+                <span>SYNTAX / PUNCTUATION</span>
+                <span>⌁</span>
+              </div>
+
+              <div class="metric-value">
+                ${metricValue(syntactic)}
+              </div>
+
+              <div class="metric-sub">
+                Returned structural signal
+              </div>
             </div>
 
-            <div class="metric-sub">
-              Returned structural signal
+            <div class="metric-card">
+              <div class="metric-label">
+                <span>LANGUAGE / SLANG</span>
+                <span>🗣</span>
+              </div>
+
+              <div class="metric-value">
+                ${metricValue(slang)}
+              </div>
+
+              <div class="metric-sub">
+                Returned language signal
+              </div>
             </div>
+
           </div>
 
-          <div class="metric-card">
-            <div class="metric-label">
-              <span>LANGUAGE / SLANG</span>
-              <span>🗣</span>
-            </div>
-
-            <div class="metric-value">
-              ${metricValue(slang)}
-            </div>
-
-            <div class="metric-sub">
-              Returned language signal
-            </div>
-          </div>
-
-        </div>
-
-        ${
-          aiAvailable
-            ? `
-              <div
-                class="panel panel-pad"
-                style="
-                  margin-bottom:16px;
-                  background:var(--bg-main);
-                  border:1px solid var(--border-line);
-                "
-              >
+          ${
+            aiAvailable
+              ? `
                 <div
+                  class="panel panel-pad"
                   style="
-                    display:flex;
-                    justify-content:space-between;
-                    align-items:center;
-                    gap:10px;
-                    margin-bottom:8px;
+                    margin-bottom:16px;
+                    background:var(--bg-main);
+                    border:1px solid var(--border-line);
                   "
                 >
-                  <div>
-                    <span class="kicker">AI LINGUISTIC ANALYSIS</span>
-
-                    <h4
-                      style="
-                        margin:2px 0 0 0;
-                        font-size:13px;
-                        color:var(--text-main);
-                      "
-                    >
-                      AI-assisted observable writing comparison
-                    </h4>
-                  </div>
-
-                  <span class="badge green">
-                    ${esc(aiProvider)}
+                  <span class="kicker">
+                    AI LINGUISTIC ANALYSIS
                   </span>
-                </div>
 
-                ${
-                  aiSummary
-                    ? `
-                      <p
-                        style="
-                          margin:0 0 12px 0;
+                  <h4 style="
+                    margin:2px 0 8px;
+                    font-size:13px;
+                    color:var(--text-main);
+                  ">
+                    AI-assisted observable writing comparison
+                  </h4>
+
+                  ${
+                    aiSummary
+                      ? `
+                        <p style="
+                          margin:0 0 12px;
                           font-size:12px;
                           color:var(--text-sub);
                           line-height:1.6;
-                        "
-                      >
-                        ${esc(aiSummary)}
-                      </p>
-                    `
-                    : ""
-                }
+                        ">
+                          ${esc(aiSummary)}
+                        </p>
+                      `
+                      : ""
+                  }
 
-                ${
-                  sharedCharacteristics.length
-                    ? `
-                      <div style="margin-top:10px">
-                        <strong
-                          style="
+                  ${
+                    sharedCharacteristics.length
+                      ? `
+                        <div style="margin-top:10px">
+                          <strong style="
                             font-size:11.5px;
                             color:var(--text-main);
-                          "
-                        >
-                          Shared observable characteristics
-                        </strong>
+                          ">
+                            Shared observable characteristics
+                          </strong>
 
-                        ${renderList(sharedCharacteristics)}
-                      </div>
-                    `
-                    : ""
-                }
+                          ${renderList(
+                            sharedCharacteristics
+                          )}
+                        </div>
+                      `
+                      : ""
+                  }
 
-                ${
-                  differences.length
-                    ? `
-                      <div style="margin-top:12px">
-                        <strong
-                          style="
+                  ${
+                    differences.length
+                      ? `
+                        <div style="margin-top:12px">
+                          <strong style="
                             font-size:11.5px;
                             color:var(--text-main);
-                          "
-                        >
-                          Distinguishing characteristics
-                        </strong>
+                          ">
+                            Distinguishing characteristics
+                          </strong>
 
-                        ${renderList(differences)}
-                      </div>
-                    `
-                    : ""
-                }
+                          ${renderList(
+                            differences
+                          )}
+                        </div>
+                      `
+                      : ""
+                  }
 
-                <div
-                  style="
+                  <div style="
                     margin-top:12px;
                     padding-top:9px;
                     border-top:1px solid var(--border-line);
                     font-size:10.5px;
                     color:var(--text-muted);
                     line-height:1.5;
+                  ">
+                    AI analysis describes observable linguistic
+                    characteristics. It does not establish a person's
+                    identity or authorship.
+                  </div>
+                </div>
+              `
+              : `
+                <div
+                  class="panel panel-pad"
+                  style="
+                    margin-bottom:16px;
+                    background:var(--bg-main);
+                    border:1px solid var(--border-line);
                   "
                 >
-                  AI analysis describes observable linguistic
-                  characteristics. It does not establish a person's identity
-                  or authorship.
-                </div>
-              </div>
-            `
-            : `
-              <div
-                class="panel panel-pad"
-                style="
-                  margin-bottom:16px;
-                  background:var(--bg-main);
-                  border:1px solid var(--border-line);
-                "
-              >
-                <span class="kicker">AI LINGUISTIC ANALYSIS</span>
+                  <span class="kicker">
+                    AI LINGUISTIC ANALYSIS
+                  </span>
 
-                <h4
-                  style="
-                    margin:2px 0 6px 0;
+                  <h4 style="
+                    margin:2px 0 6px;
                     font-size:13px;
                     color:var(--text-main);
-                  "
-                >
-                  AI augmentation unavailable
-                </h4>
+                  ">
+                    AI augmentation unavailable
+                  </h4>
 
-                <p
-                  style="
+                  <p style="
                     margin:0;
                     font-size:11.5px;
                     color:var(--text-sub);
                     line-height:1.55;
-                  "
-                >
-                  The comparison response did not contain an AI linguistic
-                  analysis. Classical stylometric results shown above are
-                  retained. This does not mean that AI analysis failed; it
-                  means no AI result was returned by the current Persona
-                  service.
-                </p>
-              </div>
-            `
-        }
+                  ">
+                    The Persona comparison response did not contain
+                    an AI linguistic analysis. Classical stylometric
+                    results are retained.
+                  </p>
+                </div>
+              `
+          }
 
-        <div
-          class="panel panel-pad"
-          style="
-            background:var(--bg-main);
-            border:1px solid var(--border-line);
-          "
-        >
-          <h4
+          <div
+            class="panel panel-pad"
             style="
-              margin:0 0 6px 0;
-              font-size:12.5px;
-              color:var(--text-main);
+              background:var(--bg-main);
+              border:1px solid var(--border-line);
             "
           >
-            Analytical Forensic Assessment
-          </h4>
+            <h4 style="
+              margin:0 0 6px;
+              font-size:12.5px;
+              color:var(--text-main);
+            ">
+              Analytical Forensic Assessment
+            </h4>
 
-          <p
-            style="
+            <p style="
               margin:0;
               font-size:12px;
               color:var(--text-sub);
               line-height:1.6;
-            "
-          >
-            ${esc(
-              res.assessment ||
-              res.summary ||
-              (
-                similarity !== null
-                  ? `The supplied writing samples produced a measured stylistic similarity of ${similarity}%. Review the underlying evidence and source samples before drawing any attribution conclusion.`
-                  : "The Persona service returned a comparison without a directly usable overall similarity score."
-              )
-            )}
-          </p>
+            ">
+              ${esc(
+                res.assessment ||
+                res.summary ||
+                (
+                  similarity !== null
+                    ? `The supplied writing samples produced a measured stylistic similarity of ${similarity}%. Review the underlying evidence and source samples before drawing any attribution conclusion.`
+                    : "The Persona service returned a comparison without a directly usable overall similarity score."
+                )
+              )}
+            </p>
 
-          <div
-            style="
+            <div style="
               margin-top:10px;
               padding-top:9px;
               border-top:1px solid var(--border-line);
               font-size:10.5px;
               color:var(--text-muted);
               line-height:1.5;
-            "
-          >
-            Persona analysis is a decision-support signal. Similarity alone
-            must not be presented as confirmed identity or proof of common
-            authorship.
+            ">
+              Persona analysis is a decision-support signal.
+              Similarity alone must not be presented as confirmed
+              identity or proof of common authorship.
+            </div>
           </div>
-        </div>
-      `;
+        `;
 
-    } catch (err) {
-      resultsEl.innerHTML = `
-        <div class="error-state">
-          <div class="error-icon">⚠️</div>
-          Comparison failed: ${esc(err.message)}
-        </div>`;
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "⚡ Execute Stylometric Comparison";
-    }
-  };
+      } catch (err) {
+        resultsEl.innerHTML = `
+          <div class="error-state">
+            <div class="error-icon">⚠️</div>
+            Comparison failed:
+            ${esc(err.message)}
+          </div>
+        `;
+      } finally {
+        btn.disabled = false;
+        btn.textContent =
+          "⚡ Execute Stylometric Comparison";
+      }
+    };
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * Run automatic panels + manual comparison
+   * ------------------------------------------------------------
+   */
+
+  if (engineStatus) {
+    setBadge(
+      engineStatus,
+      invId
+        ? "ANALYSIS READY"
+        : "SELECT INVESTIGATION",
+      invId ? "blue" : "amber"
+    );
+  }
+
+  await Promise.all([
+    loadAutomaticPersona(),
+    loadMigration()
+  ]);
+
+  await setupManualComparison();
 }
 
 // ------------------------------------------------------------------
