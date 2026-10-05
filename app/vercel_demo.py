@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 
 from .config import DB_PATH
-from .seed_demo import seed
 
 
 DEMO_INVESTIGATION_ID = "INV-DEMO-2026"
@@ -24,7 +23,10 @@ def initialize_vercel_demo() -> None:
     if os.getenv("PRALAYX_DEMO_SEEDED") == "1":
         return
 
+    # Configure the database path BEFORE importing seed_demo.
     os.environ["PRALAYX_DB_PATH"] = DB_PATH
+
+    from .seed_demo import seed
 
     seed()
 
