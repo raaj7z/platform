@@ -7,6 +7,7 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 import os
+from .config import SCHEMA_PATH
 
 DB_PATH = os.getenv(
     "PRALAYX_DB_PATH",
