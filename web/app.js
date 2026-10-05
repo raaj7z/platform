@@ -1,4 +1,5 @@
 /* PRALAYX Master Application JavaScript -- Pure Frontend Consumer of Existing Platform APIs */
+let PRALAYX_HOSTED_DEMO = false;
 
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c]));
 
@@ -40,6 +41,51 @@ async function api(path, opt = {}) {
   return d;
 }
 
+async function detectHostedDemoMode() {
+  try {
+    const health = await api("/api/health");
+    PRALAYX_HOSTED_DEMO = health.demo_mode === true;
+  } catch (e) {
+    PRALAYX_HOSTED_DEMO = false;
+  }
+}
+
+function showHostedDemoNotice(type = "crawler") {
+  const existing = document.getElementById("pralayx-demo-modal");
+  if (existing) existing.remove();
+
+  const crawler = type === "crawler";
+
+  const title = crawler
+    ? "Live Crawler Unavailable"
+    : "Live OSINT Unavailable";
+
+  const explanation = crawler
+    ? "Live dark-web collection requires authorized Tor/network access and runtime infrastructure that is not enabled in this hosted demonstration."
+    : "External OSINT providers require authorized credentials and runtime access that are not enabled in this hosted demonstration.";
+
+  const modal = document.createElement("div");
+  modal.id = "pralayx-demo-modal";
+
+  modal.innerHTML = `
+    <div style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:20px;">
+      <div style="width:min(520px,100%);background:var(--panel,#111827);border:1px solid var(--border-line,rgba(255,255,255,.12));border-radius:12px;padding:24px;box-shadow:0 24px 80px rgba(0,0,0,.5);">
+        <div style="font-size:10px;letter-spacing:.14em;color:var(--blue,#60a5fa);margin-bottom:8px;">HOSTED DEMONSTRATION</div>
+        <h2 style="margin:0 0 12px">${title}</h2>
+        <p style="margin:0 0 16px;color:var(--text-muted,#9ca3af);line-height:1.6;font-size:13px;">${explanation}</p>
+        <div style="padding:12px;border-radius:8px;background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.16);color:var(--text-muted,#9ca3af);font-size:11px;line-height:1.6;margin-bottom:18px;">
+          This deployment uses a controlled synthetic investigation to demonstrate the PRALAYX investigation, evidence, correlation, Persona, timeline and reporting workflow.
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+          <button class="btn ghost" type="button" onclick="document.getElementById('pralayx-demo-modal')?.remove()">Close</button>
+          <a class="btn primary" href="/web/investigation.html?id=INV-DEMO-2026">Open Demo Investigation</a>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
 function typeBadgeClass(type) {
   const t = String(type || "").toLowerCase();
   if (t === "handle" || t === "username" || t === "actor") return "blue";
@@ -61,7 +107,7 @@ function renderStatus(v) {
 
 const NAV = `
 <div class="brand">
-  <div class="logo-mark">◒</div>
+  <div class="logo-mark">鈼�</div>
   <div class="logo-info">
     <div class="logo-name">PRALAY<em>X</em></div>
     <span class="logo-sub">Threat Intelligence</span>
@@ -74,46 +120,46 @@ const NAV = `
 <nav class="nav">
   <div class="nav-title">OPERATIONS</div>
   <a data-page="dashboard" href="/web/index.html">
-    <div class="nav-item-left"><span class="nav-ico">⌂</span><span class="nav-label">Dashboard</span></div>
+    <div class="nav-item-left"><span class="nav-ico">鈱�</span><span class="nav-label">Dashboard</span></div>
   </a>
   <a data-page="investigations" href="/web/investigations.html">
-    <div class="nav-item-left"><span class="nav-ico">📋</span><span class="nav-label">Investigations</span></div>
+    <div class="nav-item-left"><span class="nav-ico">馃搵</span><span class="nav-label">Investigations</span></div>
   </a>
   <a data-page="crawl" href="/web/crawl.html">
-    <div class="nav-item-left"><span class="nav-ico">＋</span><span class="nav-label">Dark Web Crawler</span></div>
+    <div class="nav-item-left"><span class="nav-ico">锛�</span><span class="nav-label">Dark Web Crawler</span></div>
   </a>
   <a data-page="monitoring" href="/web/monitoring.html">
-    <div class="nav-item-left"><span class="nav-ico">◉</span><span class="nav-label">Monitoring & Alerts</span></div>
+    <div class="nav-item-left"><span class="nav-ico">鈼�</span><span class="nav-label">Monitoring & Alerts</span></div>
   </a>
 
   <div class="nav-title">INTELLIGENCE</div>
   <a data-page="correlation" href="/web/correlation.html">
-    <div class="nav-item-left"><span class="nav-ico">⌘</span><span class="nav-label">Attribution Graph</span></div>
+    <div class="nav-item-left"><span class="nav-ico">鈱�</span><span class="nav-label">Attribution Graph</span></div>
   </a>
   <a data-page="osint" href="/web/osint.html">
-    <div class="nav-item-left"><span class="nav-ico">◎</span><span class="nav-label">OSINT Engine</span></div>
+    <div class="nav-item-left"><span class="nav-ico">鈼�</span><span class="nav-label">OSINT Engine</span></div>
   </a>
   <a data-page="actors" href="/web/actors.html">
-    <div class="nav-item-left"><span class="nav-ico">👤</span><span class="nav-label">Threat Actors</span></div>
+    <div class="nav-item-left"><span class="nav-ico">馃懁</span><span class="nav-label">Threat Actors</span></div>
   </a>
   <a data-page="stylometry" href="/web/stylometry.html">
-    <div class="nav-item-left"><span class="nav-ico">⌁</span><span class="nav-label">Persona Profiler</span></div>
+    <div class="nav-item-left"><span class="nav-ico">鈱�</span><span class="nav-label">Persona Profiler</span></div>
     <span class="nav-badge">NLP</span>
   </a>
 
   <div class="nav-title">EVIDENCE & DOSSIERS</div>
   <a data-page="findings" href="/web/findings.html">
-    <div class="nav-item-left"><span class="nav-ico">🔐</span><span class="nav-label">Evidence Vault</span></div>
+    <div class="nav-item-left"><span class="nav-ico">馃攼</span><span class="nav-label">Evidence Vault</span></div>
   </a>
   <a data-page="reports" href="/web/reports.html">
-    <div class="nav-item-left"><span class="nav-ico">▤</span><span class="nav-label">Reports & Dossiers</span></div>
+    <div class="nav-item-left"><span class="nav-ico">鈻�</span><span class="nav-label">Reports & Dossiers</span></div>
   </a>
   <a data-page="settings" href="/web/settings.html">
-    <div class="nav-item-left"><span class="nav-ico">⚙</span><span class="nav-label">System Settings</span></div>
+    <div class="nav-item-left"><span class="nav-ico">鈿�</span><span class="nav-label">System Settings</span></div>
   </a>
 </nav>
 <div class="sidebar-foot">
-  <button id="btn-toggle-sidebar" type="button" class="btn ghost sm" style="width:100%">◀ Collapse Sidebar</button>
+  <button id="btn-toggle-sidebar" type="button" class="btn ghost sm" style="width:100%">鈼€ Collapse Sidebar</button>
 </div>`;
 
 function initShell() {
@@ -129,7 +175,7 @@ function initShell() {
     toggleBtn.onclick = () => {
       sidebarEl.classList.toggle("collapsed");
       const isCollapsed = sidebarEl.classList.contains("collapsed");
-      toggleBtn.innerHTML = isCollapsed ? "▶" : "◀ Collapse Sidebar";
+      toggleBtn.innerHTML = isCollapsed ? "鈻�" : "鈼€ Collapse Sidebar";
     };
   }
 
@@ -154,15 +200,15 @@ async function renderContextBar(invId) {
   const holder = document.querySelector("#investigation-context-root");
   if (!holder || !invId) return;
   holder.innerHTML = `<div class="investigation-context-bar"><div class="context-info"><div class="skeleton skeleton-line" style="width:300px;height:12px"></div></div></div>`;
-  let target = "—", status = "UNKNOWN", lastActivity = "—";
+  let target = "鈥�", status = "UNKNOWN", lastActivity = "鈥�";
   try {
     const data = await api("/api/investigations");
     const list = (data.investigations || (Array.isArray(data) ? data : [])) || [];
     const inv = list.find(i => (i.investigation_id || i.id) === invId);
     if (inv) {
-      target = inv.target || "—";
+      target = inv.target || "鈥�";
       status = inv.status || "UNKNOWN";
-      lastActivity = (inv.updated_at || inv.created_at || "—").slice(0, 16).replace("T", " ");
+      lastActivity = (inv.updated_at || inv.created_at || "鈥�").slice(0, 16).replace("T", " ");
     }
   } catch(e) { /* non-critical */ }
 
@@ -188,9 +234,9 @@ async function renderContextBar(invId) {
       </div>
       <div class="context-actions">
         <a href="/web/crawl.html?id=${encodeURIComponent(invId)}" class="btn ghost sm">+ Crawl</a>
-        <a href="/web/investigation.html?id=${encodeURIComponent(invId)}&tab=osint" class="btn ghost sm" id="ctx-osint-btn">◎ OSINT</a>
-        <a href="/web/stylometry.html?id=${encodeURIComponent(invId)}" class="btn ghost sm">⇁ Compare</a>
-        <a href="/web/correlation.html?id=${encodeURIComponent(invId)}" class="btn primary sm">⌘ Graph</a>
+        <a href="/web/investigation.html?id=${encodeURIComponent(invId)}&tab=osint" class="btn ghost sm" id="ctx-osint-btn">鈼� OSINT</a>
+        <a href="/web/stylometry.html?id=${encodeURIComponent(invId)}" class="btn ghost sm">鈬� Compare</a>
+        <a href="/web/correlation.html?id=${encodeURIComponent(invId)}" class="btn primary sm">鈱� Graph</a>
       </div>
     </div>`;
 
@@ -288,11 +334,11 @@ async function dashboard() {
             return `<div style="padding:10px;border-bottom:1px solid var(--border-line);display:flex;justify-content:space-between;align-items:center">
               <div>
                 <strong style="font-size:13px;color:var(--text-main)">${esc(id)}</strong>
-                <div style="font-size:11px;color:var(--text-muted)">Target: <span style="color:var(--cyan)">${esc(x.target || "—")}</span></div>
+                <div style="font-size:11px;color:var(--text-muted)">Target: <span style="color:var(--cyan)">${esc(x.target || "鈥�")}</span></div>
               </div>
               <div style="display:flex;gap:6px;align-items:center">
                 ${renderStatus(x.status)}
-                <a class="btn primary sm" href="/web/investigation.html?id=${encodeURIComponent(id)}">Workspace ➔</a>
+                <a class="btn primary sm" href="/web/investigation.html?id=${encodeURIComponent(id)}">Workspace 鉃�</a>
               </div>
             </div>`;
           }).join("")
@@ -349,7 +395,7 @@ window.triggerWatchScan = async function(watchId, btnEl) {
     });
 
     if (btnEl) {
-      btnEl.textContent = "Done ✓";
+      btnEl.textContent = "Done 鉁�";
       btnEl.style.color = "var(--green)";
       setTimeout(() => {
         btnEl.disabled = false;
@@ -403,7 +449,7 @@ async function investigationPage() {
     const list = (data.investigations || (Array.isArray(data) ? data : [])) || [];
     const inv = list.find(i => (i.investigation_id || i.id) === invId);
     if (inv) {
-      if (titleEl) titleEl.textContent = `${invId} — ${inv.target || "Target"}`;
+      if (titleEl) titleEl.textContent = `${invId} 鈥� ${inv.target || "Target"}`;
       if (statusBadge) {
         statusBadge.textContent = (inv.status || "UNKNOWN").toUpperCase();
         statusBadge.className = `badge ${inv.status === "completed" ? "green" : inv.status === "running" ? "blue" : "amber"}`;
@@ -437,12 +483,12 @@ async function investigationPage() {
       });
 
       summaryEl.innerHTML = `
-        <div class="metric-card"><div class="metric-label"><span>FINDINGS</span><span>🔍</span></div><div class="metric-value">${findings.length}</div><div class="metric-sub">Extracted indicators</div></div>
-        <div class="metric-card"><div class="metric-label"><span>TIMELINE</span><span>📋</span></div><div class="metric-value">${events.length}</div><div class="metric-sub">Logged events</div></div>
-        <div class="metric-card"><div class="metric-label"><span>ACTOR HANDLES</span><span>👤</span></div><div class="metric-value">${handles.length}</div><div class="metric-sub">Unique handles</div></div>
-        <div class="metric-card"><div class="metric-label"><span>CRYPTO WALLETS</span><span>💰</span></div><div class="metric-value">${wallets.length}</div><div class="metric-sub">BTC / XMR</div></div>`;
+        <div class="metric-card"><div class="metric-label"><span>FINDINGS</span><span>馃攳</span></div><div class="metric-value">${findings.length}</div><div class="metric-sub">Extracted indicators</div></div>
+        <div class="metric-card"><div class="metric-label"><span>TIMELINE</span><span>馃搵</span></div><div class="metric-value">${events.length}</div><div class="metric-sub">Logged events</div></div>
+        <div class="metric-card"><div class="metric-label"><span>ACTOR HANDLES</span><span>馃懁</span></div><div class="metric-value">${handles.length}</div><div class="metric-sub">Unique handles</div></div>
+        <div class="metric-card"><div class="metric-label"><span>CRYPTO WALLETS</span><span>馃挵</span></div><div class="metric-value">${wallets.length}</div><div class="metric-sub">BTC / XMR</div></div>`;
     } catch(e) {
-      summaryEl.innerHTML = Array(4).fill(`<div class="metric-card"><div class="metric-value">—</div></div>`).join("");
+      summaryEl.innerHTML = Array(4).fill(`<div class="metric-card"><div class="metric-value">鈥�</div></div>`).join("");
     }
   }
 
@@ -567,10 +613,10 @@ async function checkRecentOsintJob(currentInvId) {
         osintResults.innerHTML = `
           <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:14px;margin-bottom:12px">
             <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:18px">❌</span>
+              <span style="font-size:18px">鉂�</span>
               <div>
                 <strong style="color:#b91c1c;font-size:13px">Previous Manual OSINT Scan Failed</strong>
-                <p style="margin:4px 0 0 0;font-size:12px;color:#7f1d1d">Target: <code>${esc(target)}</code> • Reason: <strong>${esc(errReason)}</strong></p>
+                <p style="margin:4px 0 0 0;font-size:12px;color:#7f1d1d">Target: <code>${esc(target)}</code> 鈥� Reason: <strong>${esc(errReason)}</strong></p>
               </div>
             </div>
             <div style="margin-top:8px;font-size:11px;color:#991b1b">Check provider API keys in <a href="/web/settings.html" style="color:#2563eb;text-decoration:underline">Settings</a> or ensure network connectivity to darknet relays.</div>
@@ -590,7 +636,7 @@ async function loadCaseOverview(invId) {
       findingsEl.innerHTML = f.length
         ? f.map(x => `<div style="padding:8px 0;border-bottom:1px solid var(--border-line);display:flex;justify-content:space-between;align-items:center"><div><span class="badge ${typeBadgeClass(x.finding_type||x.type)}" style="margin-right:6px">${esc(x.finding_type||x.type||"finding")}</span><code style="font-size:11px;font-weight:600">${esc(x.value||x.finding_value||"")}</code></div><span style="font-size:10px;color:var(--text-muted)">${esc((x.created_at||"").slice(0,10))}</span></div>`).join("")
         : `<div class="empty">No findings yet. Start a crawl or run OSINT to collect indicators.</div>`;
-    } catch(e) { findingsEl.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div>${esc(e.message)}</div>`; }
+    } catch(e) { findingsEl.innerHTML = `<div class="error-state"><div class="error-icon">鈿狅笍</div>${esc(e.message)}</div>`; }
   }
   if (timelineEl) {
     try {
@@ -599,7 +645,7 @@ async function loadCaseOverview(invId) {
       timelineEl.innerHTML = ev.length
         ? ev.map(x => `<div style="padding:8px 0;border-bottom:1px solid var(--border-line)"><div style="display:flex;align-items:center;gap:8px"><span class="badge blue" style="font-size:9px">${esc(x.event_type||"EVENT")}</span><span style="font-size:11px;color:var(--text-muted)">${esc((x.created_at||x.timestamp||"").slice(0,19).replace("T"," "))}</span></div><div style="font-size:12px;color:var(--text-main);margin-top:3px">${esc(x.description||x.detail||x.message||"")}</div></div>`).join("")
         : `<div class="empty">No timeline events recorded yet.</div>`;
-    } catch(e) { timelineEl.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div>${esc(e.message)}</div>`; }
+    } catch(e) { timelineEl.innerHTML = `<div class="error-state"><div class="error-icon">鈿狅笍</div>${esc(e.message)}</div>`; }
   }
 }
 
@@ -613,7 +659,7 @@ async function loadCaseFindingsFull(invId) {
       ? findings.map(f => `<tr>
           <td><span class="badge ${typeBadgeClass(f.finding_type||f.type)}">${esc(f.finding_type||f.type||"finding")}</span></td>
           <td><code style="font-size:11.5px;font-weight:600">${esc(f.value||f.finding_value||"")}</code></td>
-          <td style="font-size:11px;color:var(--text-muted);max-width:240px;overflow:hidden;text-overflow:ellipsis">${esc(f.source_url||f.source||"—")}</td>
+          <td style="font-size:11px;color:var(--text-muted);max-width:240px;overflow:hidden;text-overflow:ellipsis">${esc(f.source_url||f.source||"鈥�")}</td>
           <td><span class="badge ${parseFloat(f.confidence||0)>0.7?"green":"amber"}">${Math.round((parseFloat(f.confidence)||0.5)*100)}%</span></td>
           <td style="font-size:11px;color:var(--text-muted)">${esc((f.created_at||f.evidence_collected_at||"").slice(0,16).replace("T"," "))}</td>
         </tr>`).join("")
@@ -637,7 +683,7 @@ async function loadCaseOsint(invId) {
     if (osintFindings.length === 0) {
       container.innerHTML = `
         <div class="empty" style="padding:28px 16px">
-          <div style="font-size:28px;margin-bottom:8px">◎</div>
+          <div style="font-size:28px;margin-bottom:8px">鈼�</div>
           <strong>No OSINT enrichment records yet for this case.</strong>
           <div style="font-size:11.5px;color:var(--text-muted);margin-top:4px">Enter a domain, handle, IP, or BTC wallet above and click <strong>Run OSINT</strong> to query live OSINT providers.</div>
         </div>`;
@@ -672,21 +718,21 @@ async function loadCasePersona(invId) {
     if (personaFindings.length === 0) {
       container.innerHTML = `
         <div class="empty" style="padding:28px 16px">
-          <div style="font-size:28px;margin-bottom:8px">📈</div>
+          <div style="font-size:28px;margin-bottom:8px">馃搱</div>
           <strong>No AI behavioral or stylometric profile extracted yet.</strong>
           <div style="font-size:12px;color:var(--text-muted);margin:6px 0 14px 0">Compare target text samples with dark web forum handles in the Persona Compare workspace.</div>
-          <a href="/web/stylometry.html?id=${encodeURIComponent(invId)}" class="btn primary">Open Persona Compare & Profiler ➔</a>
+          <a href="/web/stylometry.html?id=${encodeURIComponent(invId)}" class="btn primary">Open Persona Compare & Profiler 鉃�</a>
         </div>`;
     } else {
       container.innerHTML = `
         <div class="grid g2" style="margin-bottom:14px">
           <div class="metric-card">
-            <div class="metric-label"><span>ATTRIBUTED ACTOR</span><span>👤</span></div>
+            <div class="metric-label"><span>ATTRIBUTED ACTOR</span><span>馃懁</span></div>
             <div class="metric-value" style="font-size:16px">${esc(data.actor_id || "Unattributed")}</div>
             <div class="metric-sub">${esc(data.target || "Target")}</div>
           </div>
           <div class="metric-card">
-            <div class="metric-label"><span>STYLES & MARKERS</span><span>⌁</span></div>
+            <div class="metric-label"><span>STYLES & MARKERS</span><span>鈱�</span></div>
             <div class="metric-value" style="font-size:16px">${personaFindings.length} Markers</div>
             <div class="metric-sub">Punctuation, emoji & vocabulary</div>
           </div>
@@ -726,7 +772,7 @@ async function loadCaseTimelineFull(invId) {
         </div>`).join("")
       : `<div class="empty">No timeline events recorded yet.</div>`;
   } catch(e) {
-    el.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div>${esc(e.message)}</div>`;
+    el.innerHTML = `<div class="error-state"><div class="error-icon">鈿狅笍</div>${esc(e.message)}</div>`;
   }
 }
 
@@ -752,7 +798,7 @@ async function loadCaseEvidence(invId) {
         </div>`).join("") + `</div>`
       : `<div class="empty">No evidence artifacts stored yet.</div>`;
   } catch(e) {
-    el.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div>${esc(e.message)}</div>`;
+    el.innerHTML = `<div class="error-state"><div class="error-icon">鈿狅笍</div>${esc(e.message)}</div>`;
   }
 }
 
@@ -772,8 +818,8 @@ async function loadCaseMonitoring(invId) {
           ${wl.length ? wl.map(w => `
             <div style="padding:10px;border:1px solid var(--border-line);border-radius:6px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
               <div>
-                <strong style="font-size:12px;color:var(--text-main)">${esc(w.target_url || w.target || "—")}</strong>
-                <div style="font-size:11px;color:var(--text-muted)">Interval: ${w.interval_minutes || 60}m • Last: ${esc((w.last_scan_at || "Never").slice(0,16).replace("T"," "))}</div>
+                <strong style="font-size:12px;color:var(--text-main)">${esc(w.target_url || w.target || "鈥�")}</strong>
+                <div style="font-size:11px;color:var(--text-muted)">Interval: ${w.interval_minutes || 60}m 鈥� Last: ${esc((w.last_scan_at || "Never").slice(0,16).replace("T"," "))}</div>
               </div>
               <div style="display:flex;gap:6px;align-items:center">
                 ${renderStatus(w.status)}
@@ -795,7 +841,7 @@ async function loadCaseMonitoring(invId) {
         </div>
       </div>`;
   } catch(e) {
-    el.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div>${esc(e.message)}</div>`;
+    el.innerHTML = `<div class="error-state"><div class="error-icon">鈿狅笍</div>${esc(e.message)}</div>`;
   }
 }
 
@@ -848,6 +894,10 @@ async function osintPage() {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (PRALAYX_HOSTED_DEMO) {
+      showHostedDemoNotice("osint");
+      return;
+    }
     const inv = document.getElementById("osint-investigation")?.value?.trim();
     const target = document.getElementById("osint-target")?.value?.trim();
     const targetType = document.getElementById("osint-type")?.value || "username";
@@ -926,7 +976,7 @@ async function pollOsintJob(jobId, terminal, statusBadge, invId) {
           if (statusBadge) { statusBadge.textContent = "COMPLETE"; statusBadge.className = "badge green"; }
           if (terminal) terminal.innerHTML += `<span class="terminal-line success">[PRALAYX] Scan complete. Indicators attributed to case ${esc(invId)}.</span>\n`;
           if (invId && terminal) {
-            terminal.innerHTML += `<span class="terminal-line data">[RESULT] <a href="/web/investigation.html?id=${encodeURIComponent(invId)}" style="color:var(--cyan)">Open Case Workspace →</a></span>\n`;
+            terminal.innerHTML += `<span class="terminal-line data">[RESULT] <a href="/web/investigation.html?id=${encodeURIComponent(invId)}" style="color:var(--cyan)">Open Case Workspace 鈫�</a></span>\n`;
           }
           resolve();
           return;
@@ -948,7 +998,7 @@ async function pollOsintJob(jobId, terminal, statusBadge, invId) {
           resolve();
         }
       } catch(e) {
-        if (attempts < maxAttempts) setTimeout(tick, interval);
+                if (attempts < maxAttempts) setTimeout(tick, interval);
         else resolve();
       }
     };
@@ -973,13 +1023,13 @@ async function loadOsintHistory(invId) {
         findings.slice(0, 25).map(f => `<tr>
           <td><span class="badge ${typeBadgeClass(f.finding_type||f.type)}">${esc(f.finding_type||f.type||"finding")}</span></td>
           <td><code style="font-size:11.5px;font-weight:600">${esc(f.value||f.finding_value||"")}</code></td>
-          <td style="font-size:11px;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(f.source_url||f.source||"—")}</td>
+          <td style="font-size:11px;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(f.source_url||f.source||"â€”")}</td>
           <td><span class="badge ${parseFloat(f.confidence||0)>0.7?"green":"amber"}">${Math.round((parseFloat(f.confidence)||0.5)*100)}%</span></td>
           <td style="font-size:11px;color:var(--text-muted)">${esc((f.created_at||f.evidence_collected_at||"").slice(0,16).replace("T"," "))}</td>
         </tr>`).join("") + `</tbody></table>`
       : `<div class="empty">No OSINT findings yet. Enter target observable above to begin scan.</div>`;
   } catch(e) {
-    el.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div>${esc(e.message)}</div>`;
+    el.innerHTML = `<div class="error-state"><div class="error-icon">âš ï¸</div>${esc(e.message)}</div>`;
   }
 }
 
@@ -1033,17 +1083,17 @@ async function stylometryPage() {
         </div>
         <div class="grid g3" style="margin-bottom:16px">
           <div class="metric-card">
-            <div class="metric-label"><span>VOCABULARY SIMILARITY</span><span>📖</span></div>
+            <div class="metric-label"><span>VOCABULARY SIMILARITY</span><span>ðŸ“–</span></div>
             <div class="metric-value">${Math.round((res.lexical_similarity || 0.82) * 100)}%</div>
             <div class="metric-sub">Cosine word-vector overlap</div>
           </div>
           <div class="metric-card">
-            <div class="metric-label"><span>SYNTAX & PUNCTUATION</span><span>⌁</span></div>
+            <div class="metric-label"><span>SYNTAX & PUNCTUATION</span><span>âŒ</span></div>
             <div class="metric-value">${Math.round((res.syntactic_similarity || 0.75) * 100)}%</div>
             <div class="metric-sub">Punctuation & emoji profile</div>
           </div>
           <div class="metric-card">
-            <div class="metric-label"><span>HINGLISH / SLANG OVERLAP</span><span>🇮🇳</span></div>
+            <div class="metric-label"><span>HINGLISH / SLANG OVERLAP</span><span>ðŸ‡®ðŸ‡³</span></div>
             <div class="metric-value">${Math.round((res.slang_overlap || 0.88) * 100)}%</div>
             <div class="metric-sub">Regional phonetic dialect</div>
           </div>
@@ -1055,10 +1105,10 @@ async function stylometryPage() {
           </p>
         </div>`;
     } catch(err) {
-      resultsEl.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div>Comparison failed: ${esc(err.message)}</div>`;
+      resultsEl.innerHTML = `<div class="error-state"><div class="error-icon">âš ï¸</div>Comparison failed: ${esc(err.message)}</div>`;
     } finally {
       btn.disabled = false;
-      btn.textContent = "⚡ Execute Stylometric Comparison";
+      btn.textContent = "âš¡ Execute Stylometric Comparison";
     }
   };
 }
@@ -1086,6 +1136,10 @@ async function crawlPage() {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (PRALAYX_HOSTED_DEMO) {
+      showHostedDemoNotice("crawler");
+      return;
+    }
     const url = document.getElementById("crawl-url")?.value?.trim();
     const username = document.getElementById("crawl-username")?.value?.trim() || "";
     const workers = parseInt(document.getElementById("crawl-workers")?.value || "2");
@@ -1153,7 +1207,7 @@ async function pollCrawlJob(jobId, terminal, statusBadge, invId) {
         if (status === "COMPLETE" || status === "DONE" || status === "COMPLETED") {
           if (statusBadge) { statusBadge.textContent = "COMPLETE"; statusBadge.className = "badge green"; }
           if (terminal) terminal.innerHTML += `<span class="terminal-line success">[DONE] Crawl complete. Findings saved.</span>\n`;
-          if (invId && terminal) terminal.innerHTML += `<span class="terminal-line data">[RESULT] <a href="/web/investigation.html?id=${encodeURIComponent(invId)}" style="color:var(--cyan)">Open Investigation Workspace →</a></span>\n`;
+          if (invId && terminal) terminal.innerHTML += `<span class="terminal-line data">[RESULT] <a href="/web/investigation.html?id=${encodeURIComponent(invId)}" style="color:var(--cyan)">Open Investigation Workspace â†’</a></span>\n`;
           resolve(); return;
         }
         if (status === "FAILED" || status === "ERROR") {
@@ -1192,7 +1246,7 @@ async function loadCrawlJobs() {
         </tr>`).join("") + `</tbody></table>`
       : `<div class="empty">No crawl jobs yet. Submit a target URL above to begin.</div>`;
   } catch(e) {
-    el.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div>${esc(e.message)}</div>`;
+    el.innerHTML = `<div class="error-state"><div class="error-icon">âš ï¸</div>${esc(e.message)}</div>`;
   }
 }
 
@@ -1215,7 +1269,7 @@ async function loadCaseGraph(invId, filterCategory = "all", searchQuery = "") {
     if (globalGraphNodes.length <= 1) {
       container.innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:360px;color:var(--text-muted);padding:40px;text-align:center">
-          <div style="font-size:36px;margin-bottom:12px">🕸️</div>
+          <div style="font-size:36px;margin-bottom:12px">ðŸ•¸ï¸</div>
           <strong style="font-size:14px;color:var(--text-main)">No relationship data available for this investigation</strong>
           <p style="font-size:12px;margin-top:6px;max-width:400px">Run a dark web crawl or OSINT scan to extract technical observables, handles, TLS certificates, and cryptocurrency wallets to populate the attribution network.</p>
         </div>`;
@@ -1224,7 +1278,7 @@ async function loadCaseGraph(invId, filterCategory = "all", searchQuery = "") {
 
     renderFilteredGraph(container, detailsEl, filterCategory, searchQuery);
   } catch(e) {
-    container.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div>Failed to load relationship graph: ${esc(e.message)}</div>`;
+    container.innerHTML = `<div class="error-state"><div class="error-icon">âš ï¸</div>Failed to load relationship graph: ${esc(e.message)}</div>`;
   }
 }
 
@@ -1266,9 +1320,9 @@ function renderInteractiveCanvasGraph(container, detailsEl, nodes, edges) {
   const toolbar = document.createElement("div");
   toolbar.style.cssText = "position:absolute;top:12px;right:12px;z-index:20;display:flex;gap:6px;background:rgba(15,23,42,0.85);backdrop-filter:blur(4px);padding:6px;border-radius:6px;border:1px solid #334155";
   toolbar.innerHTML = `
-    <button id="graph-btn-zoom-in" class="btn ghost sm" style="color:#e2e8f0;font-size:13px;padding:2px 8px" title="Zoom In">🔍 +</button>
-    <button id="graph-btn-zoom-out" class="btn ghost sm" style="color:#e2e8f0;font-size:13px;padding:2px 8px" title="Zoom Out">🔍 -</button>
-    <button id="graph-btn-reset" class="btn ghost sm" style="color:#e2e8f0;font-size:11px;padding:2px 8px" title="Reset View">⌖ Reset</button>
+    <button id="graph-btn-zoom-in" class="btn ghost sm" style="color:#e2e8f0;font-size:13px;padding:2px 8px" title="Zoom In">ðŸ” +</button>
+    <button id="graph-btn-zoom-out" class="btn ghost sm" style="color:#e2e8f0;font-size:13px;padding:2px 8px" title="Zoom Out">ðŸ” -</button>
+    <button id="graph-btn-reset" class="btn ghost sm" style="color:#e2e8f0;font-size:11px;padding:2px 8px" title="Reset View">âŒ– Reset</button>
     <span id="graph-zoom-label" style="font-size:11px;color:#94a3b8;align-self:center;padding:0 4px">100%</span>
   `;
   container.appendChild(toolbar);
@@ -1319,12 +1373,12 @@ function renderInteractiveCanvasGraph(container, detailsEl, nodes, edges) {
 
   function getNodeStyle(type) {
     const t = String(type || "").toLowerCase();
-    if (t === "target") return { color: "#3b82f6", icon: "🎯", stroke: "#60a5fa" };
-    if (t === "actor") return { color: "#ef4444", icon: "👤", stroke: "#f87171" };
-    if (t === "handle" || t === "username") return { color: "#06b6d4", icon: "🏷️", stroke: "#22d3ee" };
-    if (t.includes("crypto") || t.includes("btc") || t.includes("xmr") || t.includes("wallet")) return { color: "#f59e0b", icon: "₿", stroke: "#fbbf24" };
-    if (t.includes("tls") || t.includes("server") || t.includes("banner") || t.includes("ip")) return { color: "#a855f7", icon: "🖥️", stroke: "#c084fc" };
-    return { color: "#10b981", icon: "🔍", stroke: "#34d399" };
+    if (t === "target") return { color: "#3b82f6", icon: "ðŸŽ¯", stroke: "#60a5fa" };
+    if (t === "actor") return { color: "#ef4444", icon: "ðŸ‘¤", stroke: "#f87171" };
+    if (t === "handle" || t === "username") return { color: "#06b6d4", icon: "ðŸ·ï¸", stroke: "#22d3ee" };
+    if (t.includes("crypto") || t.includes("btc") || t.includes("xmr") || t.includes("wallet")) return { color: "#f59e0b", icon: "â‚¿", stroke: "#fbbf24" };
+    if (t.includes("tls") || t.includes("server") || t.includes("banner") || t.includes("ip")) return { color: "#a855f7", icon: "ðŸ–¥ï¸", stroke: "#c084fc" };
+    return { color: "#10b981", icon: "ðŸ”", stroke: "#34d399" };
   }
 
   // Basic relaxation layout
@@ -1594,7 +1648,7 @@ async function correlationPage() {
       caseSelect.innerHTML = `<option value="">Select an Investigation</option>` + list.map(i => {
         const id = i.investigation_id || i.id;
         const sel = id === invId ? 'selected' : '';
-        return `<option value="${esc(id)}" ${sel}>${esc(id)} — ${esc(i.target || "Target")}</option>`;
+        return `<option value="${esc(id)}" ${sel}>${esc(id)} â€” ${esc(i.target || "Target")}</option>`;
       }).join("");
 
       caseSelect.addEventListener("change", e => {
@@ -1644,7 +1698,7 @@ async function correlationPage() {
         if (container) {
           container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:360px;color:var(--text-muted);padding:40px;text-align:center">
-              <div style="font-size:36px;margin-bottom:12px">🔍</div>
+              <div style="font-size:36px;margin-bottom:12px">ðŸ”</div>
               <strong style="font-size:14px;color:var(--text-main)">Select an Investigation to View Graph</strong>
               <p style="font-size:12px;margin-top:6px">Choose an investigation from the dropdown above to render its correlation network.</p>
             </div>`;
@@ -1668,17 +1722,17 @@ async function investigationsListPage() {
   const renderTable = (list) => {
     tbody.innerHTML = list.length
       ? list.map(inv => {
-          const id = inv.investigation_id || inv.id || "—";
+          const id = inv.investigation_id || inv.id || "â€”";
           const statusCls = (inv.status || "").toLowerCase() === "completed" ? "green"
                           : (inv.status || "").toLowerCase() === "running" ? "blue" : "amber";
           return `<tr>
             <td><code style="font-size:12px;color:var(--cyan)">${esc(id)}</code></td>
-            <td><strong style="font-size:12px;color:var(--text-main)">${esc(inv.target || "—")}</strong></td>
+            <td><strong style="font-size:12px;color:var(--text-main)">${esc(inv.target || "â€”")}</strong></td>
             <td><span class="badge ${statusCls}">${esc((inv.status || "UNKNOWN").toUpperCase())}</span></td>
-            <td style="font-size:11px;color:var(--text-muted)">${esc(inv.source || inv.initiated_by || "—")}</td>
+            <td style="font-size:11px;color:var(--text-muted)">${esc(inv.source || inv.initiated_by || "â€”")}</td>
             <td style="font-size:11px;color:var(--text-muted)">${esc((inv.created_at || "").slice(0,16).replace("T"," "))}</td>
             <td style="font-size:11px;color:var(--text-muted)">${esc((inv.updated_at || "").slice(0,16).replace("T"," "))}</td>
-            <td><a href="/web/investigation.html?id=${encodeURIComponent(id)}" class="btn primary sm">Open Workspace →</a></td>
+            <td><a href="/web/investigation.html?id=${encodeURIComponent(id)}" class="btn primary sm">Open Workspace â†’</a></td>
           </tr>`;
         }).join("")
       : `<tr><td colspan="7" class="empty">No investigations found. Create one above to begin.</td></tr>`;
@@ -1690,7 +1744,7 @@ async function investigationsListPage() {
     if (countEl) countEl.textContent = `${allInvestigations.length} CASES`;
     renderTable(allInvestigations);
   } catch(e) {
-    tbody.innerHTML = `<tr><td colspan="7" class="error-state"><div class="error-icon">⚠️</div>${esc(e.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="error-state"><div class="error-icon">âš ï¸</div>${esc(e.message)}</td></tr>`;
   }
 
   if (searchInput) {
@@ -1772,27 +1826,27 @@ async function threatActorsPage() {
         ? list.map(a => {
             const handlesBadge = (a.handles || []).length
               ? a.handles.map(h => `<span class="badge blue" style="margin:2px 2px 2px 0;font-size:10px">${esc(h)}</span>`).join("")
-              : `<span style="font-size:11px;color:var(--text-muted)">—</span>`;
+              : `<span style="font-size:11px;color:var(--text-muted)">â€”</span>`;
 
             const walletsBadge = (a.wallets || []).length
               ? a.wallets.map(w => `<code style="font-size:10.5px;color:var(--cyan);display:block;margin-bottom:2px">${esc(w)}</code>`).join("")
-              : `<span style="font-size:11px;color:var(--text-muted)">—</span>`;
+              : `<span style="font-size:11px;color:var(--text-muted)">â€”</span>`;
 
-            const invId = a.investigation_id || "—";
+            const invId = a.investigation_id || "â€”";
 
             return `<tr>
               <td><code style="font-size:11px;color:var(--blue)">${esc(a.actor_id || "ACT-UNKNOWN")}</code></td>
               <td>
                 <strong style="font-size:13px;color:var(--text-main);display:block">${esc(a.display_name || "Unknown Actor")}</strong>
-                <span class="badge ${a.confidence > 0.7 ? "green" : "amber"}" style="font-size:9.5px;margin-top:2px">${esc((a.category || "unknown").toUpperCase())} • ${Math.round((a.confidence || 0.5) * 100)}%</span>
+                <span class="badge ${a.confidence > 0.7 ? "green" : "amber"}" style="font-size:9.5px;margin-top:2px">${esc((a.category || "unknown").toUpperCase())} â€¢ ${Math.round((a.confidence || 0.5) * 100)}%</span>
               </td>
               <td><div style="max-width:220px;overflow:hidden">${handlesBadge}</div></td>
               <td><div style="max-width:220px;overflow:hidden">${walletsBadge}</div></td>
-              <td style="font-size:11px;color:var(--text-muted)">${esc((a.created_at || "").slice(0, 10) || "—")}</td>
+              <td style="font-size:11px;color:var(--text-muted)">${esc((a.created_at || "").slice(0, 10) || "â€”")}</td>
               <td>
                 <div style="display:flex;gap:4px;flex-wrap:wrap">
-                  ${invId !== "—" ? `<a href="/web/investigation.html?id=${encodeURIComponent(invId)}" class="btn primary sm">Open Case →</a>` : ""}
-                  ${invId !== "—" ? `<a href="/web/correlation.html?id=${encodeURIComponent(invId)}" class="btn ghost sm">⌘ Graph</a>` : ""}
+                  ${invId !== "â€”" ? `<a href="/web/investigation.html?id=${encodeURIComponent(invId)}" class="btn primary sm">Open Case â†’</a>` : ""}
+                  ${invId !== "â€”" ? `<a href="/web/correlation.html?id=${encodeURIComponent(invId)}" class="btn ghost sm">âŒ˜ Graph</a>` : ""}
                   <button class="btn ghost sm" onclick="watchActor('${esc(a.display_name)}', '${esc(invId)}')">+ Watch</button>
                 </div>
               </td>
@@ -1878,8 +1932,8 @@ async function monitoringPage() {
         ? wl.map(w => `
           <div style="padding:10px;border-bottom:1px solid var(--border-line);display:flex;justify-content:space-between;align-items:center">
             <div>
-              <strong style="font-size:12.5px;color:var(--text-main)">${esc(w.target_url || w.target || "—")}</strong>
-              <div style="font-size:11px;color:var(--text-muted)">Interval: ${w.interval_minutes || 60}m • Last: ${esc((w.last_scan_at || "Never").slice(0, 16).replace("T", " "))}</div>
+              <strong style="font-size:12.5px;color:var(--text-main)">${esc(w.target_url || w.target || "â€”")}</strong>
+              <div style="font-size:11px;color:var(--text-muted)">Interval: ${w.interval_minutes || 60}m â€¢ Last: ${esc((w.last_scan_at || "Never").slice(0, 16).replace("T", " "))}</div>
             </div>
             <div style="display:flex;gap:6px;align-items:center">
               ${renderStatus(w.status)}
@@ -1925,7 +1979,7 @@ async function findingsPage() {
     tbody.innerHTML = findings.length
       ? findings.map(f => `<tr>
           <td><code style="font-size:11px;color:var(--cyan)">${esc(f.evidence_id || f.finding_id || "EVD-" + Math.abs(hashCode(f.value || "")))}</code></td>
-          <td><a href="/web/investigation.html?id=${encodeURIComponent(f.investigation_id || invId)}" class="badge blue" style="font-size:10px">${esc(f.investigation_id || invId || "—")}</a></td>
+          <td><a href="/web/investigation.html?id=${encodeURIComponent(f.investigation_id || invId)}" class="badge blue" style="font-size:10px">${esc(f.investigation_id || invId || "â€”")}</a></td>
           <td><span class="badge ${typeBadgeClass(f.finding_type || f.type)}">${esc(f.finding_type || f.type || "finding")}</span></td>
           <td><strong style="font-size:12px;color:var(--text-main)">${esc(f.value || f.finding_value || "")}</strong></td>
           <td><span class="badge ${parseFloat(f.confidence||0)>0.7?"green":"amber"}">${Math.round((parseFloat(f.confidence)||0.5)*100)}%</span></td>
@@ -1965,7 +2019,7 @@ async function reportsPage() {
             const id = i.investigation_id || i.id;
             return `<tr>
               <td><code>${esc(id)}</code></td>
-              <td><strong>${esc(i.target || "—")}</strong></td>
+              <td><strong>${esc(i.target || "â€”")}</strong></td>
               <td>${renderStatus(i.status)}</td>
               <td><a href="/api/export/${encodeURIComponent(id)}/pdf" class="btn primary sm">Download PDF</a></td>
               <td><a href="/api/reports/download-package/${encodeURIComponent(id)}" class="btn secondary sm">ZIP Package</a></td>
@@ -1981,7 +2035,8 @@ async function reportsPage() {
 // ------------------------------------------------------------------
 // 12. GLOBAL BOOTSTRAP
 // ------------------------------------------------------------------
-function boot() {
+async function boot() {
+  await detectHostedDemoMode();
   initShell();
   const p = location.pathname;
 
