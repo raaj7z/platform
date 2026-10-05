@@ -37,14 +37,20 @@ if [ -f "$VENDOR/osint-engine/requirements.txt" ]; then
 fi
 
 echo "Persona heavy ML dependencies are skipped for Vercel."
-echo "Platform Persona adapter will use the lightweight/local-compatible path."
 
-# Vercel filesystem is read-only at runtime except /tmp.
-# Redirect crawler writable data to /tmp.
+# ============================================================
+# VERCEL RUNTIME WRITABLE PATHS
+# ============================================================
+#
+# Vercel's deployed application filesystem is read-only.
+# The crawler currently creates data/output/log/report directories
+# during import, so redirect those directories to /tmp.
+#
+
 CRAWLER_CONFIG="$VENDOR/DarkWeb-Deanonymization/src/config.py"
 
 if [ -f "$CRAWLER_CONFIG" ]; then
-    echo "Patching crawler writable paths..."
+    echo "Patching crawler paths for Vercel..."
 
     python3 - "$CRAWLER_CONFIG" <<'PY'
 from pathlib import Path
@@ -54,26 +60,42 @@ path = Path(sys.argv[1])
 text = path.read_text(encoding="utf-8")
 
 text = text.replace(
-    'Path(__file__).resolve().parent.parent / "data"',
-    'Path("/tmp/pralayx-crawler/data")'
+    "DATA_DIR   = BASE_DIR / 'data'",
+    "DATA_DIR   = Path('/tmp/pralayx-crawler/data')",
 )
 
 text = text.replace(
-    'Path(__file__).resolve().parent.parent / "logs"',
-    'Path("/tmp/pralayx-crawler/logs")'
+    "OUTPUT_DIR = BASE_DIR / 'output'",
+    "OUTPUT_DIR = Path('/tmp/pralayx-crawler/output')",
 )
 
 text = text.replace(
-    'Path(__file__).resolve().parent.parent / "output"',
-    'Path("/tmp/pralayx-crawler/output")'
+    "LOG_DIR    = BASE_DIR / 'logs'",
+    "LOG_DIR    = Path('/tmp/pralayx-crawler/logs')",
+)
+
+text = text.replace(
+    "REPORT_DIR = BASE_DIR / 'reports'",
+    "REPORT_DIR = Path('/tmp/pralayx-crawler/reports')",
+)
+
+text = text.replace(
+    "DB_PATH    = DATA_DIR / 'crawler.db'",
+    "DB_PATH    = DATA_DIR / 'crawler.db'",
 )
 
 path.write_text(text, encoding="utf-8")
 PY
+
+    echo "Crawler config after patch:"
+    grep -E "DATA_DIR|OUTPUT_DIR|LOG_DIR|REPORT_DIR|DB_PATH" "$CRAWLER_CONFIG" || true
+else
+    echo "WARNING: crawler config not found: $CRAWLER_CONFIG"
 fi
 
 mkdir -p /tmp/pralayx-crawler/data
-mkdir -p /tmp/pralayx-crawler/logs
 mkdir -p /tmp/pralayx-crawler/output
+mkdir -p /tmp/pralayx-crawler/logs
+mkdir -p /tmp/pralayx-crawler/reports
 
 echo "=== PRALAYX Vercel Build Complete ==="
