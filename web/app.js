@@ -986,84 +986,1594 @@ async function loadOsintHistory(invId) {
 // ------------------------------------------------------------------
 // 4. PERSONA COMPARISON WORKSTATION (/web/stylometry.html)
 // ------------------------------------------------------------------
-async function stylometryPage() {
+
+// -------------------------------async function stylometryPage() {
   const btn = document.getElementById("btn-compare-personas");
   const resultsEl = document.getElementById("persona-compare-results");
+
   if (!btn || !resultsEl) return;
 
   const invId = new URLSearchParams(location.search).get("id") || "";
 
-  btn.onclick = async () => {
-    const textA = document.getElementById("persona-text-a")?.value?.trim();
-    const textB = document.getElementById("persona-text-b")?.value?.trim();
+  /*
+   * ---------------------------------------------------------------
+   * Build the automatic-analysis panels dynamically.
+   *
+   * This keeps the existing stylometry.html structure intact and
+   * avoids changing unrelated frontend files.
+   * ---------------------------------------------------------------
+   */
 
-    if (!textA || !textB) {
-      alert("Please provide both Reference Text A and Candidate Text B for stylometric comparison.");
+  const manualPanel = btn.closest(".panel");
+
+  let automaticPanel = document.getElementById("persona-automatic-panel");
+  let migrationPanel = document.getElementById("persona-migration-panel");
+
+  if (!automaticPanel && manualPanel) {
+    automaticPanel = document.createElement("section");
+    automaticPanel.id = "persona-automatic-panel";
+    automaticPanel.className = "panel panel-pad";
+    automaticPanel.style.marginBottom = "16px";
+
+    automaticPanel.innerHTML = `
+      <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:16px;
+        flex-wrap:wrap;
+      ">
+        <div>
+          <span class="kicker">AUTOMATIC PERSONA ANALYSIS</span>
+
+          <h2 style="
+            margin:3px 0 4px;
+            font-size:18px;
+          ">
+            Investigation Persona Profile
+          </h2>
+
+          <p id="persona-automatic-summary" style="
+            margin:0;
+            color:var(--text-muted);
+            font-size:12px;
+          ">
+            Loading investigation Persona evidence...
+          </p>
+        </div>
+
+        <span id="persona-data-badge" class="badge blue">
+          LOADING
+        </span>
+      </div>
+
+      <div id="persona-automatic-content"
+           style="margin-top:16px">
+
+        <div class="skeleton skeleton-line wide"></div>
+
+        <div class="skeleton skeleton-line med"
+             style="margin-top:8px"></div>
+
+      </div>
+    `;
+
+    manualPanel.parentNode.insertBefore(
+      automaticPanel,
+      manualPanel
+    );
+  }
+
+
+  if (!migrationPanel && manualPanel) {
+    migrationPanel = document.createElement("section");
+    migrationPanel.id = "persona-migration-panel";
+    migrationPanel.className = "panel panel-pad";
+    migrationPanel.style.marginBottom = "16px";
+
+    migrationPanel.innerHTML = `
+      <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:16px;
+        flex-wrap:wrap;
+      ">
+        <div>
+          <span class="kicker">PSEUDONYMOUS MIGRATION</span>
+
+          <h2 style="
+            margin:3px 0 4px;
+            font-size:18px;
+          ">
+            Candidate Handle Continuity
+          </h2>
+
+          <p id="persona-migration-summary" style="
+            margin:0;
+            color:var(--text-muted);
+            font-size:12px;
+          ">
+            Checking Persona continuity analysis...
+          </p>
+        </div>
+
+        <span id="persona-migration-badge"
+              class="badge blue">
+          CHECKING
+        </span>
+      </div>
+
+      <div id="persona-migration-content"
+           style="margin-top:16px">
+
+        <div class="skeleton skeleton-line wide"></div>
+
+        <div class="skeleton skeleton-line med"
+             style="margin-top:8px"></div>
+
+      </div>
+    `;
+
+    manualPanel.parentNode.insertBefore(
+      migrationPanel,
+      manualPanel
+    );
+  }
+
+
+  const automaticContent =
+    document.getElementById("persona-automatic-content");
+
+  const automaticSummary =
+    document.getElementById("persona-automatic-summary");
+
+  const automaticBadge =
+    document.getElementById("persona-data-badge");
+
+  const migrationContent =
+    document.getElementById("persona-migration-content");
+
+  const migrationSummary =
+    document.getElementById("persona-migration-summary");
+
+  const migrationBadge =
+    document.getElementById("persona-migration-badge");
+
+
+  /*
+   * ---------------------------------------------------------------
+   * Helpers
+   * ---------------------------------------------------------------
+   */
+
+  function safePercent(value) {
+    const n = Number(value);
+
+    if (!Number.isFinite(n)) {
+      return null;
+    }
+
+    return Math.round(
+      Math.max(0, Math.min(1, n)) * 100
+    );
+  }
+
+
+  function displayPercent(value) {
+    const n = safePercent(value);
+
+    return n === null ? "—" : `${n}%`;
+  }
+
+
+  function parseMetadata(value) {
+    if (!value) return {};
+
+    if (typeof value === "object") {
+      return value;
+    }
+
+    try {
+      return JSON.parse(value);
+    } catch (_) {
+      return {};
+    }
+  }
+
+
+  function findContinuityRelationship(relationships) {
+    return (relationships || []).find((rel) => {
+      const type = String(
+        rel.relationship_type ||
+        rel.type ||
+        ""
+      ).toLowerCase();
+
+      return (
+        type.includes("pseudonymous") ||
+        type.includes("continuity") ||
+        type.includes("migration")
+      );
+    });
+  }
+
+
+  /*
+   * ---------------------------------------------------------------
+   * Automatic Persona / migration loading
+   * ---------------------------------------------------------------
+   */
+
+  async function loadAutomaticPersona() {
+    if (!invId) {
+      if (automaticBadge) {
+        automaticBadge.textContent = "NO CONTEXT";
+        automaticBadge.className = "badge amber";
+      }
+
+      if (automaticSummary) {
+        automaticSummary.textContent =
+          "No investigation ID was supplied.";
+      }
+
+      if (automaticContent) {
+        automaticContent.innerHTML = `
+          <div class="empty-state">
+            <strong>
+              Open Persona analysis from a specific investigation.
+            </strong>
+          </div>
+        `;
+      }
+
+      if (migrationBadge) {
+        migrationBadge.textContent = "NO CONTEXT";
+        migrationBadge.className = "badge amber";
+      }
+
+      if (migrationContent) {
+        migrationContent.innerHTML = `
+          <div class="empty-state">
+            No investigation context is available for migration analysis.
+          </div>
+        `;
+      }
+
       return;
     }
 
-    btn.disabled = true;
-    btn.textContent = "Analyzing Linguistic Patterns...";
-    resultsEl.classList.remove("hidden");
-    resultsEl.innerHTML = `<div class="panel-pad"><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line med"></div></div>`;
 
     try {
+      /*
+       * -------------------------------------------------------------
+       * SPECIAL CONTROLLED DEMO
+       *
+       * The existing backend already provides:
+       *
+       * GET /api/persona/synthetic-demo
+       *
+       * We only use it for the explicit demo investigation.
+       * -------------------------------------------------------------
+       */
+
+      if (invId === "INV-DEMO-2026") {
+        const demo = await api(
+          `/api/persona/synthetic-demo?investigation_id=${encodeURIComponent(invId)}`
+        );
+
+        renderSyntheticPersonaDemo(demo);
+
+        return;
+      }
+
+
+      /*
+       * -------------------------------------------------------------
+       * REAL / LOCAL INVESTIGATION
+       *
+       * Do not invent a Persona analysis.
+       * Read whatever Persona evidence is already stored.
+       * -------------------------------------------------------------
+       */
+
+      const investigation = await api(
+        `/api/investigations/${encodeURIComponent(invId)}`
+      );
+
+      const findings =
+        investigation.findings ||
+        [];
+
+      const relationships =
+        investigation.relationships ||
+        investigation.relations ||
+        [];
+
+
+      const personaFindings =
+        findings.filter((finding) => {
+          const source =
+            String(finding.source || "").toLowerCase();
+
+          const type =
+            String(finding.finding_type || "").toLowerCase();
+
+          return (
+            source.includes("persona") ||
+            source.includes("stylometr") ||
+            type.includes("stylometr") ||
+            type.includes("persona")
+          );
+        });
+
+
+      /*
+       * Automatic Persona result
+       */
+
+      if (!personaFindings.length) {
+        if (automaticBadge) {
+          automaticBadge.textContent = "NOT ANALYZED";
+          automaticBadge.className = "badge amber";
+        }
+
+        if (automaticSummary) {
+          automaticSummary.textContent =
+            "No stored Persona analysis is available for this investigation.";
+        }
+
+        if (automaticContent) {
+          automaticContent.innerHTML = `
+            <div class="empty-state">
+
+              <strong>
+                Automatic Persona analysis is not available yet.
+              </strong>
+
+              <div style="
+                margin-top:6px;
+                font-size:12px;
+                color:var(--text-muted);
+              ">
+                Run Persona analysis after usable source text has
+                been collected. PRALAYX does not invent a score
+                when the required evidence is unavailable.
+              </div>
+
+            </div>
+          `;
+        }
+      } else {
+        renderStoredPersonaFindings(personaFindings);
+      }
+
+
+      /*
+       * Migration relationship
+       */
+
+      const continuity =
+        findContinuityRelationship(relationships);
+
+      if (continuity) {
+        renderStoredMigration(continuity);
+      } else {
+        if (migrationBadge) {
+          migrationBadge.textContent = "NO CANDIDATE";
+          migrationBadge.className = "badge amber";
+        }
+
+        if (migrationSummary) {
+          migrationSummary.textContent =
+            "No pseudonymous-continuity relationship is stored for this investigation.";
+        }
+
+        if (migrationContent) {
+          migrationContent.innerHTML = `
+            <div class="empty-state">
+
+              <strong>
+                No migration hypothesis recorded.
+              </strong>
+
+              <div style="
+                margin-top:6px;
+                font-size:12px;
+                color:var(--text-muted);
+              ">
+                A migration hypothesis requires supporting
+                linguistic, behavioral, semantic, temporal,
+                or identifier evidence.
+              </div>
+
+            </div>
+          `;
+        }
+      }
+
+    } catch (err) {
+
+      if (automaticBadge) {
+        automaticBadge.textContent = "ERROR";
+        automaticBadge.className = "badge red";
+      }
+
+      if (automaticSummary) {
+        automaticSummary.textContent =
+          "Persona analysis could not be loaded.";
+      }
+
+      if (automaticContent) {
+        automaticContent.innerHTML = `
+          <div class="error-state">
+            <div class="error-icon">⚠️</div>
+            Persona analysis failed:
+            ${esc(err.message || String(err))}
+          </div>
+        `;
+      }
+
+      if (migrationBadge) {
+        migrationBadge.textContent = "ERROR";
+        migrationBadge.className = "badge red";
+      }
+
+      if (migrationContent) {
+        migrationContent.innerHTML = `
+          <div class="error-state">
+            <div class="error-icon">⚠️</div>
+            Migration analysis could not be loaded:
+            ${esc(err.message || String(err))}
+          </div>
+        `;
+      }
+    }
+  }
+
+
+  /*
+   * ---------------------------------------------------------------
+   * Render controlled synthetic demonstration
+   * ---------------------------------------------------------------
+   */
+
+  function renderSyntheticPersonaDemo(demo) {
+    const groupA =
+      demo.sample_group_a || {};
+
+    const groupB =
+      demo.sample_group_b || {};
+
+    const analysis =
+      demo.analysis_result || {};
+
+    const signals =
+      analysis.signals || {};
+
+
+    if (automaticBadge) {
+      automaticBadge.textContent =
+        "CONTROLLED DEMO";
+
+      automaticBadge.className =
+        "badge blue";
+    }
+
+
+    if (automaticSummary) {
+      automaticSummary.textContent =
+        "Persona migration analysis loaded from the controlled synthetic demonstration.";
+    }
+
+
+    if (automaticContent) {
+      automaticContent.innerHTML = `
+
+        <div class="grid g2"
+             style="margin-bottom:16px">
+
+          <div class="panel panel-pad"
+               style="
+                 background:var(--bg-main);
+                 border:1px solid var(--border-line);
+               ">
+
+            <span class="kicker">
+              EARLIER PERSONA
+            </span>
+
+            <h3 style="
+              margin:5px 0;
+              font-size:16px;
+            ">
+              ${esc(groupA.handle || "Unknown")}
+            </h3>
+
+            <div style="
+              color:var(--text-muted);
+              font-size:12px;
+            ">
+              ${esc(groupA.period || "—")}
+            </div>
+
+            <div style="
+              margin-top:10px;
+              font-size:12px;
+            ">
+              Source samples:
+              <strong>
+                ${groupA.sample_count ?? "—"}
+              </strong>
+            </div>
+
+          </div>
+
+
+          <div class="panel panel-pad"
+               style="
+                 background:var(--bg-main);
+                 border:1px solid var(--border-line);
+               ">
+
+            <span class="kicker">
+              CANDIDATE PERSONA
+            </span>
+
+            <h3 style="
+              margin:5px 0;
+              font-size:16px;
+            ">
+              ${esc(groupB.handle || "Unknown")}
+            </h3>
+
+            <div style="
+              color:var(--text-muted);
+              font-size:12px;
+            ">
+              ${esc(groupB.period || "—")}
+            </div>
+
+            <div style="
+              margin-top:10px;
+              font-size:12px;
+            ">
+              Source samples:
+              <strong>
+                ${groupB.sample_count ?? "—"}
+              </strong>
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div class="panel panel-pad"
+             style="
+               background:var(--bg-main);
+               border:1px solid var(--border-line);
+             ">
+
+          <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:12px;
+            flex-wrap:wrap;
+          ">
+
+            <strong>
+              Migration engine assessment
+            </strong>
+
+            <span class="badge ${
+              analysis.detected ? "amber" : "blue"
+            }">
+
+              ${
+                analysis.detected
+                  ? "CANDIDATE CONTINUITY"
+                  : "NOT DETECTED"
+              }
+
+            </span>
+
+          </div>
+
+
+          <div class="grid g3"
+               style="margin-top:14px">
+
+            <div class="metric-card">
+
+              <div class="metric-label">
+                <span>STYLE SIMILARITY</span>
+                <span>⌁</span>
+              </div>
+
+              <div class="metric-value">
+                ${displayPercent(
+                  signals.style_similarity
+                )}
+              </div>
+
+            </div>
+
+
+            <div class="metric-card">
+
+              <div class="metric-label">
+                <span>SEMANTIC SIMILARITY</span>
+                <span>◈</span>
+              </div>
+
+              <div class="metric-value">
+                ${displayPercent(
+                  signals.semantic_similarity
+                )}
+              </div>
+
+            </div>
+
+
+            <div class="metric-card">
+
+              <div class="metric-label">
+                <span>BEHAVIORAL ASSOCIATION</span>
+                <span>◌</span>
+              </div>
+
+              <div class="metric-value">
+                ${displayPercent(
+                  signals.behavioral_association
+                )}
+              </div>
+
+            </div>
+
+
+            <div class="metric-card">
+
+              <div class="metric-label">
+                <span>TEMPORAL ASSOCIATION</span>
+                <span>◷</span>
+              </div>
+
+              <div class="metric-value">
+                ${displayPercent(
+                  signals.temporal_association
+                )}
+              </div>
+
+            </div>
+
+
+            <div class="metric-card">
+
+              <div class="metric-label">
+                <span>TOPIC SIMILARITY</span>
+                <span>◎</span>
+              </div>
+
+              <div class="metric-value">
+                ${displayPercent(
+                  signals.topic_similarity
+                )}
+              </div>
+
+            </div>
+
+
+            <div class="metric-card">
+
+              <div class="metric-label">
+                <span>OVERALL SCORE</span>
+                <span>Σ</span>
+              </div>
+
+              <div class="metric-value">
+                ${displayPercent(
+                  analysis.similarity_score
+                )}
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div style="
+            margin-top:14px;
+            font-size:12px;
+            line-height:1.6;
+            color:var(--text-sub);
+          ">
+
+            ${
+              esc(
+                analysis.explanation ||
+                "The Persona engine returned an analytical migration result."
+              )
+            }
+
+          </div>
+
+        </div>
+
+
+        <div style="
+          margin-top:12px;
+          padding:10px 12px;
+          border:1px solid var(--border-line);
+          border-radius:8px;
+          font-size:11px;
+          line-height:1.6;
+          color:var(--text-muted);
+        ">
+
+          <strong style="color:var(--text-main)">
+            Controlled demonstration:
+          </strong>
+
+          ${esc(
+            demo.disclaimer ||
+            "Synthetic data only. This does not represent a real person or real-world identity."
+          )}
+
+        </div>
+      `;
+    }
+
+
+    /*
+     * -------------------------------------------------------------
+     * Migration panel
+     * -------------------------------------------------------------
+     */
+
+    if (migrationBadge) {
+      migrationBadge.textContent =
+        analysis.detected
+          ? "CANDIDATE CONTINUITY"
+          : "NOT DETECTED";
+
+      migrationBadge.className =
+        `badge ${
+          analysis.detected ? "amber" : "blue"
+        }`;
+    }
+
+
+    if (migrationSummary) {
+      migrationSummary.textContent =
+        analysis.detected
+          ? "The existing Persona migration engine detected a candidate continuity pattern in the controlled demonstration."
+          : "The existing Persona migration engine did not detect candidate continuity.";
+    }
+
+
+    if (migrationContent) {
+      const handleA =
+        groupA.handle || "Persona A";
+
+      const handleB =
+        groupB.handle || "Persona B";
+
+      const gap =
+        analysis.temporal_gap?.gap_days;
+
+
+      migrationContent.innerHTML = `
+
+        <div style="
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          gap:14px;
+          flex-wrap:wrap;
+          margin-bottom:16px;
+        ">
+
+          <div class="panel"
+               style="
+                 padding:14px 20px;
+                 min-width:180px;
+                 text-align:center;
+               ">
+
+            <div class="kicker">
+              LEGACY HANDLE
+            </div>
+
+            <strong style="
+              display:block;
+              margin-top:6px;
+              font-size:15px;
+            ">
+              ${esc(handleA)}
+            </strong>
+
+          </div>
+
+
+          <div style="
+            font-size:24px;
+            color:var(--text-muted);
+          ">
+            →
+          </div>
+
+
+          <div class="panel"
+               style="
+                 padding:14px 20px;
+                 min-width:180px;
+                 text-align:center;
+               ">
+
+            <div class="kicker">
+              CANDIDATE MIGRATED HANDLE
+            </div>
+
+            <strong style="
+              display:block;
+              margin-top:6px;
+              font-size:15px;
+            ">
+              ${esc(handleB)}
+            </strong>
+
+          </div>
+
+        </div>
+
+
+        <div class="grid g3">
+
+          <div class="metric-card">
+
+            <div class="metric-label">
+              <span>MIGRATION SCORE</span>
+              <span>◈</span>
+            </div>
+
+            <div class="metric-value">
+              ${displayPercent(
+                analysis.similarity_score
+              )}
+            </div>
+
+            <div class="metric-sub">
+              Persona migration engine
+            </div>
+
+          </div>
+
+
+          <div class="metric-card">
+
+            <div class="metric-label">
+              <span>TEMPORAL GAP</span>
+              <span>◷</span>
+            </div>
+
+            <div class="metric-value"
+                 style="font-size:17px">
+
+              ${
+                Number.isFinite(Number(gap))
+                  ? `${Math.round(Number(gap))} days`
+                  : "—"
+              }
+
+            </div>
+
+            <div class="metric-sub">
+              Between observed sample periods
+            </div>
+
+          </div>
+
+
+          <div class="metric-card">
+
+            <div class="metric-label">
+              <span>DECISION</span>
+              <span>!</span>
+            </div>
+
+            <div class="metric-value"
+                 style="font-size:15px">
+
+              ${
+                analysis.detected
+                  ? "Candidate"
+                  : "None"
+              }
+
+            </div>
+
+            <div class="metric-sub">
+              Requires investigator review
+            </div>
+
+          </div>
+
+        </div>
+
+
+        ${
+          Array.isArray(analysis.limitations) &&
+          analysis.limitations.length
+            ? `
+              <div style="
+                margin-top:12px;
+                padding:10px 12px;
+                border:1px solid var(--border-line);
+                border-radius:8px;
+                font-size:11px;
+                color:var(--text-muted);
+              ">
+
+                <strong style="color:var(--text-main)">
+                  Analysis limitations
+                </strong>
+
+                <ul style="margin:6px 0 0 18px">
+
+                  ${analysis.limitations.map(
+                    (item) => `
+                      <li>
+                        ${esc(String(item))}
+                      </li>
+                    `
+                  ).join("")}
+
+                </ul>
+
+              </div>
+            `
+            : ""
+        }
+
+
+        <div style="
+          margin-top:12px;
+          padding:10px 12px;
+          border:1px solid var(--border-line);
+          border-radius:8px;
+          font-size:11px;
+          line-height:1.6;
+          color:var(--text-muted);
+        ">
+
+          <strong style="color:var(--text-main)">
+            Important:
+          </strong>
+
+          Candidate pseudonymous continuity is an analytical
+          hypothesis. It does not establish that the handles
+          belong to the same real-world person.
+
+        </div>
+
+      `;
+    }
+  }
+
+
+  /*
+   * ---------------------------------------------------------------
+   * Render stored Persona findings for normal investigations
+   * ---------------------------------------------------------------
+   */
+
+  function renderStoredPersonaFindings(findings) {
+
+    if (automaticBadge) {
+      automaticBadge.textContent = "STORED ANALYSIS";
+      automaticBadge.className = "badge green";
+    }
+
+    if (automaticSummary) {
+      automaticSummary.textContent =
+        "Existing Persona findings are available for this investigation.";
+    }
+
+
+    const finding = findings[0] || {};
+
+    const metadata =
+      parseMetadata(finding.metadata);
+
+    const similarity =
+      metadata.similarity_score ??
+      metadata.char_ngram_sim ??
+      metadata.stylometry?.char_ngram_sim ??
+      finding.confidence;
+
+
+    if (automaticContent) {
+      automaticContent.innerHTML = `
+
+        <div class="grid g3">
+
+          <div class="metric-card">
+
+            <div class="metric-label">
+              <span>PERSONA FINDING</span>
+              <span>◈</span>
+            </div>
+
+            <div class="metric-value"
+                 style="font-size:15px">
+
+              ${esc(
+                finding.finding_type ||
+                "Persona"
+              )}
+
+            </div>
+
+            <div class="metric-sub">
+              Stored investigation evidence
+            </div>
+
+          </div>
+
+
+          <div class="metric-card">
+
+            <div class="metric-label">
+              <span>CONFIDENCE</span>
+              <span>✓</span>
+            </div>
+
+            <div class="metric-value">
+              ${displayPercent(
+                finding.confidence
+              )}
+            </div>
+
+            <div class="metric-sub">
+              Stored finding confidence
+            </div>
+
+          </div>
+
+
+          <div class="metric-card">
+
+            <div class="metric-label">
+              <span>SIMILARITY SIGNAL</span>
+              <span>⌁</span>
+            </div>
+
+            <div class="metric-value">
+              ${displayPercent(similarity)}
+            </div>
+
+            <div class="metric-sub">
+              Available Persona signal
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div style="
+          margin-top:12px;
+          padding:12px;
+          border:1px solid var(--border-line);
+          border-radius:8px;
+          font-size:12px;
+          line-height:1.6;
+          color:var(--text-sub);
+        ">
+
+          ${esc(
+            finding.value ||
+            "Persona analysis evidence is stored for this investigation."
+          )}
+
+        </div>
+
+
+        <div style="
+          margin-top:12px;
+          padding:10px 12px;
+          border:1px solid var(--border-line);
+          border-radius:8px;
+          font-size:11px;
+          color:var(--text-muted);
+        ">
+
+          Stylometric similarity is an analytical signal
+          for investigator review. It is not an identity probability.
+
+        </div>
+
+      `;
+    }
+  }
+
+
+  /*
+   * ---------------------------------------------------------------
+   * Render stored migration relationship
+   * ---------------------------------------------------------------
+   */
+
+  function renderStoredMigration(relationship) {
+
+    const from =
+      relationship.from_value ||
+      relationship.source_handle ||
+      "Source";
+
+    const to =
+      relationship.to_value ||
+      relationship.target_handle ||
+      "Candidate";
+
+
+    if (migrationBadge) {
+      migrationBadge.textContent =
+        "CANDIDATE RELATIONSHIP";
+
+      migrationBadge.className =
+        "badge amber";
+    }
+
+
+    if (migrationSummary) {
+      migrationSummary.textContent =
+        "A stored candidate continuity relationship exists in this investigation.";
+    }
+
+
+    if (migrationContent) {
+      migrationContent.innerHTML = `
+
+        <div style="
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          gap:14px;
+          flex-wrap:wrap;
+          margin-bottom:16px;
+        ">
+
+          <div class="panel"
+               style="
+                 padding:14px 20px;
+                 min-width:180px;
+                 text-align:center;
+               ">
+
+            <div class="kicker">
+              SOURCE
+            </div>
+
+            <strong style="
+              display:block;
+              margin-top:6px;
+              font-size:15px;
+            ">
+              ${esc(from)}
+            </strong>
+
+          </div>
+
+
+          <div style="
+            font-size:24px;
+            color:var(--text-muted);
+          ">
+            →
+          </div>
+
+
+          <div class="panel"
+               style="
+                 padding:14px 20px;
+                 min-width:180px;
+                 text-align:center;
+               ">
+
+            <div class="kicker">
+              CANDIDATE
+            </div>
+
+            <strong style="
+              display:block;
+              margin-top:6px;
+              font-size:15px;
+            ">
+              ${esc(to)}
+            </strong>
+
+          </div>
+
+        </div>
+
+
+        <div class="grid g2">
+
+          <div class="metric-card">
+
+            <div class="metric-label">
+              <span>RELATIONSHIP TYPE</span>
+              <span>⌁</span>
+            </div>
+
+            <div class="metric-value"
+                 style="font-size:15px">
+
+              ${esc(
+                relationship.relationship_type ||
+                "candidate continuity"
+              )}
+
+            </div>
+
+          </div>
+
+
+          <div class="metric-card">
+
+            <div class="metric-label">
+              <span>CONFIDENCE</span>
+              <span>◈</span>
+            </div>
+
+            <div class="metric-value">
+              ${displayPercent(
+                relationship.confidence
+              )}
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div style="
+          margin-top:12px;
+          padding:10px 12px;
+          border:1px solid var(--border-line);
+          border-radius:8px;
+          font-size:11px;
+          line-height:1.6;
+          color:var(--text-muted);
+        ">
+
+          This stored relationship is a candidate analytical
+          hypothesis and must not be presented as confirmed
+          real-world identity attribution.
+
+        </div>
+
+      `;
+    }
+  }
+
+
+  /*
+   * ---------------------------------------------------------------
+   * START AUTOMATIC ANALYSIS
+   * ---------------------------------------------------------------
+   */
+
+  loadAutomaticPersona();
+
+
+  /*
+   * ---------------------------------------------------------------
+   * EXISTING MANUAL STYLOMETRIC COMPARISON
+   * ---------------------------------------------------------------
+   */
+
+  btn.onclick = async () => {
+
+    const textA =
+      document.getElementById("persona-text-a")
+        ?.value
+        ?.trim();
+
+    const textB =
+      document.getElementById("persona-text-b")
+        ?.value
+        ?.trim();
+
+
+    if (!textA || !textB) {
+      alert(
+        "Please provide both Reference Text A and Candidate Text B for stylometric comparison."
+      );
+      return;
+    }
+
+
+    btn.disabled = true;
+
+    btn.textContent =
+      "Analyzing Linguistic Patterns...";
+
+
+    resultsEl.classList.remove("hidden");
+
+    resultsEl.innerHTML = `
+      <div class="panel-pad">
+
+        <div class="skeleton skeleton-line wide"></div>
+
+        <div class="skeleton skeleton-line med"
+             style="margin-top:8px"></div>
+
+      </div>
+    `;
+
+
+    try {
+
       const payload = {
         reference_text: textA,
         candidate_text: textB,
         investigation_id: invId || null
       };
 
-      const res = await api("/api/persona/compare", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
 
-      const sim = Math.round((res.similarity_score || res.overall_similarity || res.confidence || 0.78) * 100);
-      const isMatch = sim >= 70;
+      const res = await api(
+        "/api/persona/compare",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+
+
+      /*
+       * Do NOT use fabricated frontend fallback values.
+       */
+
+      const rawSimilarity =
+        res.similarity_score ??
+        res.overall_similarity ??
+        res.confidence ??
+        null;
+
+
+      const sim =
+        safePercent(rawSimilarity);
+
+
+      const lexical =
+        safePercent(
+          res.lexical_similarity
+        );
+
+
+      const syntactic =
+        safePercent(
+          res.syntactic_similarity
+        );
+
+
+      const slang =
+        safePercent(
+          res.slang_overlap
+        );
+
 
       resultsEl.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border-line);padding-bottom:12px">
+
+        <div style="
+          display:flex;
+          justify-content:space-between;
+          align-items:center;
+          margin-bottom:16px;
+          border-bottom:1px solid var(--border-line);
+          padding-bottom:12px;
+          gap:12px;
+          flex-wrap:wrap;
+        ">
+
           <div>
-            <span class="kicker">STYLOMETRIC COMPARISON RESULT</span>
-            <h2 style="margin:2px 0 0 0;font-size:18px;color:var(--text-main)">Attribution Confidence: <span style="color:${isMatch ? 'var(--green)' : 'var(--amber)'}">${sim}%</span></h2>
+
+            <span class="kicker">
+              STYLOMETRIC COMPARISON RESULT
+            </span>
+
+            <h2 style="
+              margin:2px 0 0 0;
+              font-size:18px;
+              color:var(--text-main);
+            ">
+
+              Similarity:
+
+              <span>
+                ${
+                  sim === null
+                    ? "—"
+                    : `${sim}%`
+                }
+              </span>
+
+            </h2>
+
           </div>
-          <span class="badge ${isMatch ? 'green' : 'amber'}" style="font-size:12px;padding:4px 10px">${isMatch ? 'PROBABLE IDENTICAL AUTHOR' : 'INCONCLUSIVE / DISTINCT'}</span>
+
+
+          <span class="badge blue"
+                style="
+                  font-size:12px;
+                  padding:4px 10px
+                ">
+
+            ANALYTICAL SIGNAL
+
+          </span>
+
         </div>
-        <div class="grid g3" style="margin-bottom:16px">
+
+
+        <div class="grid g3"
+             style="margin-bottom:16px">
+
+
           <div class="metric-card">
-            <div class="metric-label"><span>VOCABULARY SIMILARITY</span><span>📖</span></div>
-            <div class="metric-value">${Math.round((res.lexical_similarity || 0.82) * 100)}%</div>
-            <div class="metric-sub">Cosine word-vector overlap</div>
+
+            <div class="metric-label">
+              <span>VOCABULARY SIMILARITY</span>
+              <span>📖</span>
+            </div>
+
+            <div class="metric-value">
+              ${
+                lexical === null
+                  ? "—"
+                  : `${lexical}%`
+              }
+            </div>
+
+            <div class="metric-sub">
+              Backend-reported signal
+            </div>
+
           </div>
+
+
           <div class="metric-card">
-            <div class="metric-label"><span>SYNTAX & PUNCTUATION</span><span>⌁</span></div>
-            <div class="metric-value">${Math.round((res.syntactic_similarity || 0.75) * 100)}%</div>
-            <div class="metric-sub">Punctuation & emoji profile</div>
+
+            <div class="metric-label">
+              <span>SYNTAX & PUNCTUATION</span>
+              <span>⌁</span>
+            </div>
+
+            <div class="metric-value">
+              ${
+                syntactic === null
+                  ? "—"
+                  : `${syntactic}%`
+              }
+            </div>
+
+            <div class="metric-sub">
+              Backend-reported signal
+            </div>
+
           </div>
+
+
           <div class="metric-card">
-            <div class="metric-label"><span>HINGLISH / SLANG OVERLAP</span><span>🇮🇳</span></div>
-            <div class="metric-value">${Math.round((res.slang_overlap || 0.88) * 100)}%</div>
-            <div class="metric-sub">Regional phonetic dialect</div>
+
+            <div class="metric-label">
+              <span>SLANG / LANGUAGE OVERLAP</span>
+              <span>◌</span>
+            </div>
+
+            <div class="metric-value">
+              ${
+                slang === null
+                  ? "—"
+                  : `${slang}%`
+              }
+            </div>
+
+            <div class="metric-sub">
+              Backend-reported signal
+            </div>
+
           </div>
+
         </div>
-        <div class="panel panel-pad" style="background:var(--bg-main);border:1px solid var(--border-line)">
-          <h4 style="margin:0 0 6px 0;font-size:12.5px;color:var(--text-main)">Analytical Forensic Assessment</h4>
-          <p style="margin:0;font-size:12px;color:var(--text-sub);line-height:1.6">
-            ${esc(res.assessment || res.summary || `Extracted stylistic n-grams, sentence structure length, and unique emoji distributions show an attribution correlation of ${sim}%. Writing styles demonstrate consistent behavioral traits across dark web and clearnet samples.`)}
+
+
+        <div class="panel panel-pad"
+             style="
+               background:var(--bg-main);
+               border:1px solid var(--border-line);
+             ">
+
+          <h4 style="
+            margin:0 0 6px 0;
+            font-size:12.5px;
+            color:var(--text-main);
+          ">
+
+            Analytical Assessment
+
+          </h4>
+
+          <p style="
+            margin:0;
+            font-size:12px;
+            color:var(--text-sub);
+            line-height:1.6;
+          ">
+
+            ${esc(
+              res.assessment ||
+              res.summary ||
+              "The Persona engine returned an analytical similarity result."
+            )}
+
           </p>
-        </div>`;
-    } catch(err) {
-      resultsEl.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div>Comparison failed: ${esc(err.message)}</div>`;
+
+        </div>
+
+
+        <div style="
+          margin-top:12px;
+          padding:10px 12px;
+          border:1px solid var(--border-line);
+          border-radius:8px;
+          font-size:11px;
+          color:var(--text-muted);
+          line-height:1.6;
+        ">
+
+          Stylometric similarity is an analytical signal
+          for investigator review. It is not an identity
+          probability and does not by itself establish
+          that two accounts belong to the same person.
+
+        </div>
+
+      `;
+
+    } catch (err) {
+
+      resultsEl.innerHTML = `
+        <div class="error-state">
+
+          <div class="error-icon">
+            ⚠️
+          </div>
+
+          Comparison failed:
+          ${esc(err.message || String(err))}
+
+        </div>
+      `;
+
     } finally {
+
       btn.disabled = false;
-      btn.textContent = "⚡ Execute Stylometric Comparison";
+
+      btn.textContent =
+        "⚡ Execute Stylometric Comparison";
+
     }
   };
-}
-
-// ------------------------------------------------------------------
+}----------------------------------
 // 5. CRAWLER OPERATIONS (/web/crawl.html)
 // ------------------------------------------------------------------
 async function crawlPage() {
