@@ -1,78 +1,79 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
-echo "=== PRALAYX Vercel build ==="
+echo "=== PRALAYX Vercel Build ==="
 
-rm -rf vendor
-mkdir -p vendor
+ROOT="$(pwd)"
+VENDOR="$ROOT/vendor"
 
-echo "=== Cloning supporting repositories ==="
+rm -rf "$VENDOR"
+mkdir -p "$VENDOR"
 
+echo "Cloning crawler..."
 git clone --depth 1 https://github.com/raaj7z/DarkWeb-Deanonymization.git \
-    vendor/DarkWeb-Deanonymization
+    "$VENDOR/DarkWeb-Deanonymization"
 
+echo "Cloning OSINT engine..."
 git clone --depth 1 https://github.com/raaj7z/osint-engine.git \
-    vendor/osint-engine
+    "$VENDOR/osint-engine"
 
+echo "Cloning Persona..."
 git clone --depth 1 https://github.com/raaj7z/Persona.git \
-    vendor/Persona
+    "$VENDOR/Persona"
 
-echo "=== Installing Platform dependencies ==="
+echo "Installing Platform requirements..."
+if [ -f requirements.txt ]; then
+    pip install -r requirements.txt
+fi
 
-python3 -m pip install \
-    -r requirements.txt
+echo "Installing crawler requirements..."
+if [ -f "$VENDOR/DarkWeb-Deanonymization/requirements.txt" ]; then
+    pip install -r "$VENDOR/DarkWeb-Deanonymization/requirements.txt"
+fi
 
-echo "=== Installing Crawler dependencies ==="
+echo "Installing OSINT requirements..."
+if [ -f "$VENDOR/osint-engine/requirements.txt" ]; then
+    pip install -r "$VENDOR/osint-engine/requirements.txt"
+fi
 
-python3 -m pip install \
-    -r vendor/DarkWeb-Deanonymization/requirements.txt
+echo "Persona heavy ML dependencies are skipped for Vercel."
+echo "Platform Persona adapter will use the lightweight/local-compatible path."
 
-echo "=== Installing OSINT dependencies ==="
+# Vercel filesystem is read-only at runtime except /tmp.
+# Redirect crawler writable data to /tmp.
+CRAWLER_CONFIG="$VENDOR/DarkWeb-Deanonymization/src/config.py"
 
-python3 -m pip install \
-    -r vendor/osint-engine/requirements.txt
+if [ -f "$CRAWLER_CONFIG" ]; then
+    echo "Patching crawler writable paths..."
 
-echo "=== Persona source included; skipping heavyweight ML dependencies ==="
-
-# Do NOT install Persona/requirements.txt here.
-# sentence-transformers pulls PyTorch and can make the Vercel
-# serverless function exceed the size limit.
-
-echo "=== Patching crawler runtime paths for Vercel ==="
-
-python3 - <<'PY'
+    python3 - "$CRAWLER_CONFIG" <<'PY'
 from pathlib import Path
+import sys
 
-path = Path("vendor/DarkWeb-Deanonymization/src/config.py")
-text = path.read_text()
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
 
-old = """DATA_DIR   = BASE_DIR / 'data'
-OUTPUT_DIR = BASE_DIR / 'output'
-LOG_DIR    = BASE_DIR / 'logs'
-REPORT_DIR = BASE_DIR / 'reports'
-DB_PATH    = DATA_DIR / 'crawler.db'
-"""
+text = text.replace(
+    'Path(__file__).resolve().parent.parent / "data"',
+    'Path("/tmp/pralayx-crawler/data")'
+)
 
-new = """if os.getenv("VERCEL"):
-    DATA_DIR   = Path("/tmp/pralayx-crawler/data")
-    OUTPUT_DIR = Path("/tmp/pralayx-crawler/output")
-    LOG_DIR    = Path("/tmp/pralayx-crawler/logs")
-    REPORT_DIR = Path("/tmp/pralayx-crawler/reports")
-else:
-    DATA_DIR   = BASE_DIR / 'data'
-    OUTPUT_DIR = BASE_DIR / 'output'
-    LOG_DIR    = BASE_DIR / 'logs'
-    REPORT_DIR = BASE_DIR / 'reports'
+text = text.replace(
+    'Path(__file__).resolve().parent.parent / "logs"',
+    'Path("/tmp/pralayx-crawler/logs")'
+)
 
-DB_PATH = DATA_DIR / 'crawler.db'
-"""
+text = text.replace(
+    'Path(__file__).resolve().parent.parent / "output"',
+    'Path("/tmp/pralayx-crawler/output")'
+)
 
-if old not in text:
-    raise SystemExit("Expected crawler config block was not found")
-
-path.write_text(text.replace(old, new))
-
-print("Crawler Vercel runtime paths patched.")
+path.write_text(text, encoding="utf-8")
 PY
+fi
 
-echo "=== Build complete ==="
+mkdir -p /tmp/pralayx-crawler/data
+mkdir -p /tmp/pralayx-crawler/logs
+mkdir -p /tmp/pralayx-crawler/output
+
+echo "=== PRALAYX Vercel Build Complete ==="
