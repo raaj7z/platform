@@ -580,12 +580,42 @@ def list_watchlist_endpoint():
 
 @app.post("/api/watchlist/{watch_id}/scan-now")
 def scan_watchlist_item_now(watch_id: str):
-    items = db.list_watchlist()
-    item = next((x for x in items if x.get("watch_id") == watch_id), None)
-    if not item:
-        raise HTTPException(status_code=404, detail="Watchlist item not found")
-    return run_monitoring_scan(db, item)
+    if VERCEL_DEMO_MODE:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "HOSTED_DEMO_MODE",
+                "message": (
+                    "Live monitoring scans are disabled in this "
+                    "hosted demonstration. The displayed watchlist "
+                    "and alerts are controlled demonstration data. "
+                    "Run PRALAYX locally for authorized live monitoring."
+                ),
+            },
+        )
 
+    items = db.list_watchlist()
+
+    item = next(
+        (
+            x
+            for x in items
+            if x.get("watch_id") == watch_id
+        ),
+        None,
+    )
+
+    if not item:
+        raise HTTPException(
+            status_code=404,
+            detail="Watchlist item not found",
+        )
+
+    return run_monitoring_scan(
+        db,
+        item,
+    )
+    
 
 @app.post("/api/watchlist/{watch_id}/pause")
 def pause_watchlist_item(watch_id: str):
